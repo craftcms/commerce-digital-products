@@ -1,4 +1,4 @@
-<p align="center"><img src="./src/icon.svg" width="100" height="100" alt="Digital Products icon"></p>
+<p align="center"><img src="./resources/icon.svg" width="100" height="100" alt="Digital Products icon"></p>
 
 <h1 align="center">Digital Products</h1>
 
@@ -6,7 +6,9 @@ This plugin makes it possible to sell licenses for digital products with [Craft 
 
 ## Requirements
 
-Digital Products requires Craft 5.0.0 and Craft Commerce 5.0.0 or later.
+Digital Products 6 requires Craft CMS 6, Craft Commerce 6 and PHP 8.5 or later. It doesn't need `craftcms/yii2-adapter`.
+
+Upgrading from Digital Products 4.x or 5.x on Craft 5? Read [UPGRADE.md](UPGRADE.md).
 
 ## Installation
 
@@ -28,56 +30,42 @@ cd /path/to/my-project.test
 composer require craftcms/digital-products
 
 # tell Craft to install the plugin
-./craft install/plugin digital-products
+php artisan craft:plugin:install digital-products
 ```
 
 ## Events
 
-### The `beforeSaveProductType` and `afterSaveProductType` events
+Digital Products dispatches Laravel events. Listen to them with `Illuminate\Support\Facades\Event`.
 
-Plugins can be notified immediately before or after a product type is saved so your plugin can take action if needed:
+### `ProductTypeSaving` and `ProductTypeSaved`
+
+Dispatched before a product type is validated and saved, and after the change has been applied:
 
 ```php
-use craft\digitalproducts\events\ProductTypeEvent;
-use craft\digitalproducts\services\ProductTypes;
-use yii\base\Event;
+use CraftCms\DigitalProducts\Events\ProductTypeSaved;
+use Illuminate\Support\Facades\Event;
 
-// ...
-
-Event::on(
-    ProductTypes::class, 
-    ProductTypes::EVENT_BEFORE_SAVE_PRODUCTTYPE, 
-    function(ProductTypeEvent $e) {
-        // Custom code to be executed when a product type is saved
-    }
-);
+Event::listen(function (ProductTypeSaved $event): void {
+    // $event->productType, $event->isNew
+});
 ```
 
-### The `beforeGenerateLicenseKey` event
+### `LicenseKeyGenerating`
 
-Plugins get a chance to provide a license key instead of relying on Digital Products to generate one.
+Lets you supply a license key instead of relying on Digital Products to generate one:
 
 ```php
-use craft\digitalproducts\elements\License;
-use craft\digitalproducts\events\GenerateKeyEvent;
-use craft\digitalproducts\Plugin as DigitalProducts;
-use yii\base\Event;
+use CraftCms\DigitalProducts\Events\LicenseKeyGenerating;
+use CraftCms\DigitalProducts\Licenses;
+use Illuminate\Support\Facades\Event;
 
-// ...
+Event::listen(function (LicenseKeyGenerating $event): void {
+    do {
+        $licenseKey = // custom key generation logic, using $event->license...
+    } while (! app(Licenses::class)->isLicenseKeyUnique($licenseKey));
 
-Event::on(
-    License::class, 
-    License::EVENT_GENERATE_LICENSE_KEY, 
-    function(GenerateKeyEvent $e) {
-        $licenseService = DigitalProducts::getInstance()->getLicenses();
-        
-        do {
-            $licenseKey = // custom key generation logic...
-        } while (!$licenseService->isLicenseKeyUnique($licenseKey));
-
-        $e->licenseKey = $licenseKey;
-    }
-);
+    $event->licenseKey = $licenseKey;
+});
 ```
 
 ## Eager loading
@@ -210,7 +198,7 @@ This works with assets stored anywhere — local volumes, private S3 buckets, or
 
 ## GraphQL
 
-Digital products may be queried with GraphQL. Please read the [getting started docs](https://docs.craftcms.com/v3/graphql.html) to get up to speed with how Craft CMS handles GraphQL requests.
+Digital products may be queried with GraphQL. Please read the [getting started docs](https://craftcms.com/docs/) to get up to speed with how Craft CMS handles GraphQL requests.
 
 The GraphQL implementation provides two query options: `digitalProducts` for returning multiple products, and `digitalProduct` for returning a single product.  
 
@@ -280,3 +268,15 @@ Both the queries use the same argument set.
 | `before`| `String` | Narrows the query results to only digital products that were posted before a certain date.
 | `after`| `String` | Narrows the query results to only digital products that were posted on or after a certain date.
 | `expiryDate`| `[String]` | Narrows the query results based on the digital products’ expiry dates.
+
+## Development
+
+```bash
+composer install
+composer test       # Pest, on Craft's PluginTestCase with Commerce installed
+composer check-cs   # Pint
+composer phpstan    # Larastan
+composer serve      # builds and serves the workbench at http://127.0.0.1:8000/admin (admin / password123)
+```
+
+The workbench needs Commerce's control panel assets built into `public/vendor/craftcms/commerce/build` of the Testbench skeleton (run `vite build` in a Commerce 6 checkout and copy `public/build`).

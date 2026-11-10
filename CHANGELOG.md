@@ -1,5 +1,16 @@
 # Release Notes for Digital Products
 
+## 6.0.0 - Unreleased
+
+> {warning} Read [UPGRADE.md](UPGRADE.md) before upgrading. Class names, events and some action URLs changed.
+
+- Digital Products now requires Craft CMS 6, Craft Commerce 6 and PHP 8.5, and runs without `craftcms/yii2-adapter`.
+- The namespace changed from `craft\digitalproducts` to `CraftCms\DigitalProducts`. Stored class names are migrated on update.
+- `ProductTypes::EVENT_BEFORE_SAVE_PRODUCTTYPE`, `ProductTypes::EVENT_AFTER_SAVE_PRODUCTTYPE` and `License::EVENT_GENERATE_LICENSE_KEY` were replaced by the `ProductTypeSaving`, `ProductTypeSaved` and `LicenseKeyGenerating` Laravel events.
+- The control panel screens are now native Craft 6 screens.
+- `resave/digital-products` is now `craft:resave:digital-products`.
+- Sites upgrading from 4.x get the 5.x schema changes (SKUs and prices move into Commerce's purchasable tables) during the update.
+
 ## Unreleased
 
 - Fixed a bug where the `product()` method on `LicenseQuery` didn't accept arrays or `not` conditions. ([#104](https://github.com/craftcms/commerce-digital-products/issues/104))
