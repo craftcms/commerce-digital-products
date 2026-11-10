@@ -1,36 +1,24 @@
 <?php
-/**
- * @link https://craftcms.com/
- * @copyright Copyright (c) Pixel & Tonic, Inc.
- * @license https://craftcms.github.io/license/
- */
 
-namespace craft\digitalproducts\gql\arguments\elements;
+declare(strict_types=1);
 
-use Craft;
-use craft\behaviors\FieldLayoutBehavior;
-use craft\digitalproducts\elements\Product as ProductElement;
-use craft\digitalproducts\models\ProductType;
-use craft\digitalproducts\Plugin;
-use craft\gql\base\ElementArguments;
-use craft\gql\types\DateTime;
-use craft\gql\types\QueryArgument;
+namespace CraftCms\DigitalProducts\Gql\Arguments\Elements;
+
+use CraftCms\Cms\Gql\Arguments\ElementArguments;
+use CraftCms\Cms\Gql\Types\DateTime;
+use CraftCms\Cms\Gql\Types\QueryArgument;
+use CraftCms\Cms\Support\Facades\Gql;
+use CraftCms\DigitalProducts\Elements\Product as ProductElement;
+use CraftCms\DigitalProducts\ProductTypes;
 use GraphQL\Type\Definition\Type;
+use Override;
 
-/**
- * Class Product
- *
- * @author Pixel & Tonic, Inc. <support@pixelandtonic.com>
- * @since 2.4
- */
 class Product extends ElementArguments
 {
-    /**
-     * @inheritdoc
-     */
+    #[Override]
     public static function getArguments(): array
     {
-        return array_merge(parent::getArguments(),  self::getContentArguments(), [
+        return array_merge(parent::getArguments(), self::getContentArguments(), [
             'sku' => [
                 'name' => 'sku',
                 'type' => Type::listOf(QueryArgument::getType()),
@@ -59,15 +47,12 @@ class Product extends ElementArguments
         ]);
     }
 
-    /**
-     * @inheritdoc
-     */
+    #[Override]
     public static function getContentArguments(): array
     {
-        /** @var ProductType[]|FieldLayoutBehavior[] $productTypes */
-        $productTypes = Plugin::getInstance()->getProductTypes()->getAllProductTypes();
-        $productTypeFieldArguments = Craft::$app->getGql()->getContentArguments($productTypes, ProductElement::class);
-
-        return array_merge(parent::getContentArguments(), $productTypeFieldArguments);
+        return array_merge(parent::getContentArguments(), Gql::getContentArguments(
+            contexts: app(ProductTypes::class)->getAllProductTypes(),
+            elementType: ProductElement::class,
+        ));
     }
 }

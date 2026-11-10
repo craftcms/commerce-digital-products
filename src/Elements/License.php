@@ -1,294 +1,473 @@
 <?php
 
-namespace craft\digitalproducts\elements;
+declare(strict_types=1);
 
-use Craft;
-use craft\base\Element;
-use craft\commerce\elements\Order;
-use craft\commerce\Plugin as Commerce;
-use craft\db\Query;
-use craft\digitalproducts\elements\db\LicenseQuery;
-use craft\digitalproducts\events\GenerateKeyEvent;
-use craft\digitalproducts\models\ProductType;
-use craft\digitalproducts\Plugin as DigitalProducts;
-use craft\digitalproducts\records\License as LicenseRecord;
-use craft\elements\db\EagerLoadPlan;
-use craft\elements\db\ElementQuery;
-use craft\elements\db\ElementQueryInterface;
-use craft\elements\User;
-use craft\helpers\ArrayHelper;
-use craft\helpers\Cp;
-use craft\helpers\UrlHelper;
-use craft\models\FieldLayout;
-use yii\base\InvalidConfigException;
+namespace CraftCms\DigitalProducts\Elements;
+
+use CraftCms\Cms\Cp\Data\ActionItem;
+use CraftCms\Cms\Cp\FormFields;
+use CraftCms\Cms\Element\Data\EagerLoadPlan;
+use CraftCms\Cms\Element\Element;
+use CraftCms\Cms\Element\Queries\Contracts\ElementQueryInterface;
+use CraftCms\Cms\FieldLayout\FieldLayout;
+use CraftCms\Cms\Support\Facades\Fields;
+use CraftCms\Cms\Support\Html;
+use CraftCms\Cms\Support\Query;
+use CraftCms\Cms\Support\Str;
+use CraftCms\Cms\Support\Url;
+use CraftCms\Cms\Ui\Controls\ElementSelect;
+use CraftCms\Cms\Ui\Controls\Text;
+use CraftCms\Cms\Ui\Enums\ControlMode;
+use CraftCms\Cms\Ui\Nodes\Field;
+use CraftCms\Cms\User\Elements\User;
+use CraftCms\Cms\User\Users;
+use CraftCms\Commerce\Order\Elements\Order;
+use CraftCms\Commerce\Order\Orders;
+use CraftCms\DigitalProducts\Data\ProductType;
+use CraftCms\DigitalProducts\Database\Table;
+use CraftCms\DigitalProducts\Elements\Queries\LicenseQuery;
+use CraftCms\DigitalProducts\Licenses;
+use CraftCms\DigitalProducts\Models\License as LicenseRecord;
+use CraftCms\DigitalProducts\ProductTypes;
+use CraftCms\DigitalProducts\Settings;
+use CraftCms\DigitalProducts\Validation\LicenseRules;
+use CraftCms\RulesetValidation\Attributes\Ruleset;
+use Illuminate\Support\Facades\DB;
+use Override;
+use RuntimeException;
+
+use function CraftCms\Cms\t;
 
 /**
- * Class Commerce_LicenseElementType
+ * A license for a digital product, issued when an order is completed or paid, or created in the control panel.
  *
- * @author    Pixel & Tonic, Inc. <support@pixelandtonic.com>
- * @copyright Copyright (c) 2015, Pixel & Tonic, Inc.
- * @since     1.0
+ * @property-read Product|null $product
+ * @property-read Order|null $order
+ * @property-read User|null $owner
+ * @property-read string $licensedTo
  */
+#[Ruleset(LicenseRules::class)]
 class License extends Element
 {
-    /**
-     * @event GenerateKeyEvent The event that is triggered after a payment request is being built
-     */
-    public const EVENT_GENERATE_LICENSE_KEY = 'beforeGenerateLicenseKey';
-
-    /**
-     * @var int|null ID
-     */
-    public ?int $id = null;
-
-    /**
-     * @var int|null Product id
-     */
     public ?int $productId = null;
 
-    /**
-     * @var int|null Order id
-     */
     public ?int $orderId = null;
 
-    /**
-     * @var string|null the license key
-     */
     public ?string $licenseKey = null;
 
-    /**
-     * @var string|null License owner name
-     */
     public ?string $ownerName = null;
 
-    /**
-     * @var string|null License owner email
-     */
     public ?string $ownerEmail = null;
 
-    /**
-     * @var int|null License owner user id
-     */
     public ?int $userId = null;
 
-    /**
-     * @var string|null
-     */
-    private ?string $_licensedTo = null;
+    private ?Product $product = null;
 
-    /**
-     * @var Product|null
-     */
-    private ?Product $_product = null;
+    private ?User $user = null;
 
-    /**
-     * @var User|null
-     */
-    private ?User $_user = null;
+    private ?Order $order = null;
 
-    /**
-     * @var Order|null
-     */
-    private ?Order $_order = null;
-
-    /**
-     * @return string
-     */
-    public function __toString(): string
-    {
-        return Craft::t('digital-products', 'License for “{product}”', ['product' => $this->getProductName()]);
-    }
-
-    /**
-     * @inheritdoc
-     */
+    #[Override]
     public static function displayName(): string
     {
-        return Craft::t('digital-products', 'License');
+        return t('License', category: 'digital-products');
     }
 
-    /**
-     * Return the email tied to the license.
-     *
-     * @return string
-     */
-    public function getLicensedTo(): string
+    #[Override]
+    public static function lowerDisplayName(): string
     {
-        if (null === $this->_licensedTo) {
-            $this->_licensedTo = '';
+        return t('license', category: 'digital-products');
+    }
 
-            if (null !== $this->userId && null === $this->_user) {
-                $this->_user = Craft::$app->getUsers()->getUserById($this->userId);
-            }
+    #[Override]
+    public static function pluralDisplayName(): string
+    {
+        return t('Licenses', category: 'digital-products');
+    }
 
-            if ($this->_user) {
-                $this->_licensedTo = $this->_user->email;
-            } else {
-                $this->_licensedTo = $this->ownerEmail;
-            }
+    #[Override]
+    public static function pluralLowerDisplayName(): string
+    {
+        return t('licenses', category: 'digital-products');
+    }
+
+    #[Override]
+    public static function hasStatuses(): bool
+    {
+        return true;
+    }
+
+    #[Override]
+    public static function find(): LicenseQuery
+    {
+        return new LicenseQuery;
+    }
+
+    #[Override]
+    protected static function defineSources(string $context): array
+    {
+        $productTypes = app(ProductTypes::class)->getAllProductTypes();
+
+        $sources = [
+            [
+                'key' => '*',
+                'label' => t('All product types', category: 'digital-products'),
+                'criteria' => [],
+                'defaultSort' => ['dateCreated', 'desc'],
+            ],
+        ];
+
+        if ($productTypes !== []) {
+            $sources[] = ['heading' => t('Product Types', category: 'digital-products')];
         }
 
-        return $this->_licensedTo;
-    }
+        foreach ($productTypes as $productType) {
+            $key = 'productType:'.$productType->uid;
 
-    /**
-     * Return the product tied to the license.
-     *
-     * @return Product|null
-     */
-    public function getProduct(): ?Product
-    {
-        if ($this->_product === null) {
-            /** @var Product|null $_product */
-            $_product = Product::find()
-                ->id($this->productId)
-                ->status(null)
-                ->one();
-            $this->_product = $_product;
+            $sources[$key] = [
+                'key' => $key,
+                'label' => t($productType->name, category: 'site'),
+                'data' => ['handle' => $productType->handle],
+                'criteria' => ['typeId' => $productType->id],
+                'defaultSort' => ['dateCreated', 'desc'],
+            ];
         }
 
-        return $this->_product;
+        return $sources;
     }
 
-    /**
-     * Return the order tied to the license.
-     *
-     * @return null|Order
-     * @throws InvalidConfigException
-     */
-    public function getOrder(): ?Order
+    #[Override]
+    protected static function defineFieldLayouts(?string $source): array
     {
-        if ($this->_order === null && $this->orderId) {
-            $this->_order = Commerce::getInstance()->getOrders()->getOrderById($this->orderId);
-        }
-
-        return $this->_order;
+        return [Fields::getLayoutByType(self::class)];
     }
 
-    /**
-     * Return the product type for the product tied to the license.
-     *
-     * @return ProductType|null
-     */
-    public function getProductType(): ?ProductType
+    #[Override]
+    protected static function defineTableAttributes(): array
     {
-        return $this->getProduct()?->getType();
+        return [
+            'product' => ['label' => t('Licensed Product', category: 'digital-products')],
+            'productType' => ['label' => t('Product Type', category: 'digital-products')],
+            'licenseKey' => ['label' => t('License Key', category: 'digital-products')],
+            'dateCreated' => ['label' => t('License Issue Date', category: 'digital-products')],
+            'licensedTo' => ['label' => t('Licensed To', category: 'digital-products')],
+            'orderLink' => ['label' => t('Associated Order', category: 'digital-products')],
+            'id' => ['label' => t('ID')],
+        ];
     }
 
-    /**
-     * @return string
-     */
-    public function getProductName(): string
+    #[Override]
+    protected static function defineDefaultTableAttributes(string $source): array
     {
-        return (string)$this->getProduct();
+        $attributes = $source === '*' ? ['productType'] : [];
+
+        return [...$attributes, 'product', 'dateCreated', 'licensedTo', 'orderLink'];
     }
 
-    /**
-     * @inheritdoc
-     */
-    protected function cpEditUrl(): ?string
+    #[Override]
+    protected static function defineSearchableAttributes(): array
     {
-        return 'digital-products/licenses/' . $this->id;
+        return ['licensedTo', 'productName', 'licenseKey'];
     }
 
-    /**
-     * @inheritdoc
-     */
-    protected function crumbs(): array
+    #[Override]
+    protected static function defineSortOptions(): array
     {
         return [
             [
-                'label' => Craft::t('digital-products', 'Licenses'),
-                'url' => 'digital-products/licenses',
+                'label' => t('Owner', category: 'digital-products'),
+                'orderBy' => Table::LICENSES.'.ownerEmail',
+                'attribute' => 'licensedTo',
+            ],
+            [
+                'label' => t('License issue date', category: 'digital-products'),
+                'orderBy' => 'elements.dateCreated',
+                'attribute' => 'dateCreated',
+                'defaultDir' => 'desc',
             ],
         ];
     }
 
-    /**
-     * @inheritdoc
-     */
-    protected function metadata(): array
+    #[Override]
+    protected static function prepElementQueryForTableAttribute(ElementQueryInterface $elementQuery, string $attribute): void
     {
-        if (!$this->licenseKey) {
-            return [];
+        match ($attribute) {
+            'product', 'productType' => $elementQuery->andWith('product'),
+            'licensedTo' => $elementQuery->andWith('owner'),
+            default => parent::prepElementQueryForTableAttribute($elementQuery, $attribute),
+        };
+    }
+
+    #[Override]
+    public static function eagerLoadingMap(array $sourceElements, string $handle): array|null|false
+    {
+        $column = match ($handle) {
+            'product' => 'productId',
+            'order' => 'orderId',
+            'owner' => 'userId',
+            default => null,
+        };
+
+        if ($column === null) {
+            return parent::eagerLoadingMap($sourceElements, $handle);
         }
 
+        $map = DB::table(Table::LICENSES)
+            ->select(['id as source', "$column as target"])
+            ->whereIn('id', array_map(fn (self $element) => $element->id, $sourceElements))
+            ->whereNotNull($column)
+            ->get()
+            ->map(fn (object $row) => (array) $row)
+            ->all();
+
         return [
-            Craft::t('digital-products', 'License Key') => Cp::renderTemplate('_includes/forms/copytextbtn.twig', [
-                'value' => $this->licenseKey,
-                'class' => 'code',
-            ]),
+            'elementType' => match ($handle) {
+                'product' => Product::class,
+                'order' => Order::class,
+                'owner' => User::class,
+            },
+            'map' => $map,
+            // Licenses keep pointing at disabled or expired products
+            'criteria' => $handle === 'product' ? ['status' => null] : [],
+        ];
+    }
+
+    #[Override]
+    public function setEagerLoadedElements(string $handle, array $elements, EagerLoadPlan $plan): void
+    {
+        $element = $elements[0] ?? null;
+
+        match ($handle) {
+            'product' => $this->product = $element instanceof Product ? $element : null,
+            'owner' => $this->user = $element instanceof User ? $element : null,
+            'order' => $this->order = $element instanceof Order ? $element : null,
+            default => parent::setEagerLoadedElements($handle, $elements, $plan),
+        };
+    }
+
+    #[Override]
+    public function __toString(): string
+    {
+        return t('License for “{product}”', ['product' => $this->getProductName()], category: 'digital-products');
+    }
+
+    public function getName(): string
+    {
+        return t('License', category: 'digital-products');
+    }
+
+    #[Override]
+    public function getFieldLayout(): ?FieldLayout
+    {
+        return Fields::getLayoutByType(self::class);
+    }
+
+    /**
+     * Returns the email the license is assigned to: the owner's email, or the stored owner email.
+     */
+    public function getLicensedTo(): string
+    {
+        $owner = $this->getOwner();
+
+        return (string) ($owner !== null ? $owner->email : $this->ownerEmail);
+    }
+
+    public function getOwner(): ?User
+    {
+        if ($this->user === null && $this->userId) {
+            $this->user = app(Users::class)->getUserById($this->userId);
+        }
+
+        return $this->user;
+    }
+
+    public function getProduct(): ?Product
+    {
+        if ($this->product === null && $this->productId) {
+            $this->product = Product::find()->id($this->productId)->status(null)->one();
+        }
+
+        return $this->product;
+    }
+
+    public function getOrder(): ?Order
+    {
+        if ($this->order === null && $this->orderId) {
+            $this->order = app(Orders::class)->getOrderById($this->orderId);
+        }
+
+        return $this->order;
+    }
+
+    public function getProductType(): ?ProductType
+    {
+        $product = $this->getProduct();
+
+        return $product?->typeId ? $product->getType() : null;
+    }
+
+    public function getProductName(): string
+    {
+        return (string) $this->getProduct();
+    }
+
+    /**
+     * Returns the control panel URL of the order that issued the license.
+     */
+    public function getOrderEditUrl(): string
+    {
+        return $this->orderId ? Url::cpUrl('commerce/orders/'.$this->orderId) : '';
+    }
+
+    #[Override]
+    protected function cpEditUrl(): ?string
+    {
+        return 'digital-products/licenses/'.$this->id;
+    }
+
+    #[Override]
+    public function getPostEditUrl(): ?string
+    {
+        return Url::cpUrl('digital-products/licenses');
+    }
+
+    #[Override]
+    protected function crumbs(): array
+    {
+        return [
+            new ActionItem()->label(t('Digital Products', category: 'digital-products'))->href(Url::cpUrl('digital-products')),
+            new ActionItem()->label(t('Licenses', category: 'digital-products'))->href(Url::cpUrl('digital-products/licenses')),
         ];
     }
 
     /**
-     * @inheritdoc
+     * Returns whether a real (not temporary) license key has been set.
      */
+    public function hasLicenseKey(): bool
+    {
+        return $this->licenseKey !== null
+            && $this->licenseKey !== ''
+            && ! str_starts_with($this->licenseKey, Licenses::TEMP_KEY_PREFIX);
+    }
+
+    #[Override]
+    protected function metadata(): array
+    {
+        if (! $this->hasLicenseKey()) {
+            return [];
+        }
+
+        return [
+            t('License Key', category: 'digital-products') => Html::tag('code', Html::encode($this->licenseKey)),
+        ];
+    }
+
+    #[Override]
+    protected function metaFieldsNodes(bool $static): array
+    {
+        $mode = $static ? ControlMode::Disabled : ControlMode::Editable;
+        $productLocked = $this->id && ! $this->getIsFresh() && $this->productId !== null;
+
+        $nodes = [
+            Field::make(t('Product', category: 'digital-products'))
+                ->required()
+                ->control(ElementSelect::make('product')
+                    ->elementType(Product::class)
+                    ->criteria(['status' => null])
+                    ->limit(1)
+                    ->value(array_filter([$this->productId]))
+                    ->mode($static || $productLocked ? ControlMode::Disabled : $mode)),
+        ];
+
+        // The key is editable until it's set; afterwards it's shown in the metadata
+        if (! $this->hasLicenseKey()) {
+            $nodes[] = Field::make(t('License Key', category: 'digital-products'))
+                ->instructions(t('Leave blank to generate automatically.', category: 'digital-products'))
+                ->control(Text::make('licenseKey')->monospace()->value(null)->mode($mode));
+        }
+
+        $nodes[] = Field::make(t('Owner', category: 'digital-products'))
+            ->instructions(t('Required if Owner Email is blank.', category: 'digital-products'))
+            ->control(ElementSelect::make('owner')
+                ->elementType(User::class)
+                ->limit(1)
+                ->value(array_filter([$this->userId]))
+                ->mode($mode));
+
+        $nodes[] = Field::make(t('Owner Name', category: 'digital-products'))
+            ->control(Text::make('ownerName')->value($this->ownerName)->mode($mode));
+
+        if (! $this->userId) {
+            $nodes[] = Field::make(t('Owner Email', category: 'digital-products'))
+                ->instructions(t('Required if Owner is blank.', category: 'digital-products'))
+                ->control(Text::make('ownerEmail')->inputType('email')->value($this->ownerEmail)->mode($mode));
+        }
+
+        return [...$nodes, ...parent::metaFieldsNodes($static)];
+    }
+
+    #[Override]
     protected function metaFieldsHtml(bool $static): string
     {
-        $fields = [];
+        $productLocked = $this->id && ! $this->getIsFresh() && $this->productId !== null;
 
-        // Product (immutable after creation)
-        $fields[] = Cp::elementSelectFieldHtml([
-            'label' => Craft::t('digital-products', 'Product'),
-            'id' => 'product',
-            'name' => 'product',
-            'elementType' => Product::class,
-            'elements' => $this->productId ? Product::find()->id($this->productId)->status(null)->all() : [],
-            'limit' => 1,
-            'required' => true,
-            'errors' => $this->getErrors('productId'),
-            'disabled' => $static || ($this->id && !$this->getIsFresh() && $this->productId !== null),
-        ]);
+        $fields = [
+            FormFields::elementSelectFieldHtml([
+                'label' => t('Product', category: 'digital-products'),
+                'id' => 'product',
+                'name' => 'product',
+                'elementType' => Product::class,
+                'criteria' => ['status' => null],
+                'elements' => array_filter([$this->getProduct()]),
+                'limit' => 1,
+                'required' => true,
+                'errors' => $this->errors()->get('productId'),
+                'disabled' => $static || $productLocked,
+            ]),
+        ];
 
-        // License key — editable only on new licenses; existing keys are shown in metadata()
-        if (!$this->licenseKey) {
-            $fields[] = Cp::textFieldHtml([
-                'label' => Craft::t('digital-products', 'License Key'),
-                'instructions' => Craft::t('digital-products', 'Leave blank to generate automatically.'),
+        if (! $this->hasLicenseKey()) {
+            $fields[] = FormFields::textFieldHtml([
+                'label' => t('License Key', category: 'digital-products'),
+                'instructions' => t('Leave blank to generate automatically.', category: 'digital-products'),
                 'id' => 'licenseKey',
                 'name' => 'licenseKey',
                 'class' => 'code',
-                'value' => $this->licenseKey,
-                'errors' => $this->getErrors('licenseKey'),
+                'errors' => $this->errors()->get('licenseKey'),
                 'disabled' => $static,
             ]);
         }
 
-        // Owner (user)
-        $fields[] = Cp::elementSelectFieldHtml([
-            'label' => Craft::t('digital-products', 'Owner'),
+        $fields[] = FormFields::elementSelectFieldHtml([
+            'label' => t('Owner', category: 'digital-products'),
+            'instructions' => t('Required if Owner Email is blank.', category: 'digital-products'),
             'id' => 'owner',
             'name' => 'owner',
             'elementType' => User::class,
-            'elements' => $this->userId ? User::find()->id($this->userId)->all() : [],
+            'elements' => array_filter([$this->getOwner()]),
             'limit' => 1,
-            'errors' => $this->getErrors('userId'),
+            'errors' => $this->errors()->get('userId'),
             'disabled' => $static,
-            'instructions' => Craft::t('digital-products', 'Required if Owner Email is blank.'),
         ]);
 
-        // Owner name
-        $fields[] = Cp::textFieldHtml([
-            'label' => Craft::t('digital-products', 'Owner Name'),
+        $fields[] = FormFields::textFieldHtml([
+            'label' => t('Owner Name', category: 'digital-products'),
             'id' => 'ownerName',
             'name' => 'ownerName',
             'value' => $this->ownerName,
-            'errors' => $this->getErrors('ownerName'),
+            'errors' => $this->errors()->get('ownerName'),
             'disabled' => $static,
         ]);
 
-        // Owner email — only shown when no owner user is set
-        if (!$this->userId) {
-            $fields[] = Cp::textFieldHtml([
-                'label' => Craft::t('digital-products', 'Owner Email'),
+        if (! $this->userId) {
+            $fields[] = FormFields::textFieldHtml([
+                'label' => t('Owner Email', category: 'digital-products'),
+                'instructions' => t('Required if Owner is blank.', category: 'digital-products'),
                 'id' => 'ownerEmail',
                 'name' => 'ownerEmail',
                 'value' => $this->ownerEmail,
-                'errors' => $this->getErrors('ownerEmail'),
-                'required' => true,
+                'errors' => $this->errors()->get('ownerEmail'),
                 'disabled' => $static,
-                'instructions' => Craft::t('digital-products', 'Required if Owner is blank.'),
             ]);
         }
 
@@ -297,467 +476,116 @@ class License extends Element
         return implode("\n", $fields);
     }
 
-    /**
-     * @inheritdoc
-     */
+    #[Override]
     public function setAttributesFromRequest(array $values): void
     {
-        // Element selects post as arrays of IDs
-        if (isset($values['product'])) {
-            $productIds = $values['product'];
-            $this->productId = is_array($productIds) ? (reset($productIds) ?: null) : ($productIds ?: null);
+        // Element selects post arrays of IDs
+        if (array_key_exists('product', $values)) {
+            $productIds = (array) $values['product'];
+            $this->productId = ($id = reset($productIds)) ? (int) $id : $this->productId;
             unset($values['product']);
         }
 
-        if (isset($values['owner'])) {
-            $userIds = $values['owner'];
-            $this->userId = is_array($userIds) ? (reset($userIds) ?: null) : ($userIds ?: null);
+        if (array_key_exists('owner', $values)) {
+            $userIds = (array) $values['owner'];
+            $this->userId = ($id = reset($userIds)) ? (int) $id : null;
             unset($values['owner']);
         }
 
-        // These string properties are not covered by validation rules so setAttributes() would drop them
-        if (array_key_exists('licenseKey', $values)) {
-            $this->licenseKey = $values['licenseKey'] ?: null;
-            unset($values['licenseKey']);
-        }
+        foreach (['licenseKey', 'ownerEmail', 'ownerName'] as $attribute) {
+            if (array_key_exists($attribute, $values)) {
+                // A blank key field keeps the current (temporary) key
+                if ($attribute === 'licenseKey' && ! $values[$attribute]) {
+                    unset($values[$attribute]);
 
-        if (array_key_exists('ownerEmail', $values)) {
-            $this->ownerEmail = $values['ownerEmail'] ?: null;
-            unset($values['ownerEmail']);
-        }
+                    continue;
+                }
 
-        if (array_key_exists('ownerName', $values)) {
-            $this->ownerName = $values['ownerName'] ?: null;
-            unset($values['ownerName']);
+                $this->$attribute = $values[$attribute] ?: null;
+                unset($values[$attribute]);
+            }
         }
 
         parent::setAttributesFromRequest($values);
     }
 
-    /**
-     * Get the link for editing the order that purchased this license.
-     *
-     * @return string
-     */
-    public function getOrderEditUrl(): string
+    #[Override]
+    protected function attributeHtml(string $attribute): string
     {
-        if ($this->orderId) {
-            return UrlHelper::cpUrl('commerce/orders/' . $this->orderId);
-        }
-
-        return '';
+        return match ($attribute) {
+            'productType' => Html::encode((string) $this->getProductType()?->name),
+            'licensedTo' => Html::encode($this->getLicensedTo()),
+            'licenseKey' => $this->hasLicenseKey() ? Html::tag('code', Html::encode($this->licenseKey)) : '',
+            'orderLink' => $this->orderId
+                ? Html::a(t('View order', category: 'digital-products'), $this->getOrderEditUrl())
+                : '',
+            default => (string) parent::attributeHtml($attribute),
+        };
     }
 
-    /**
-     * @return null|string
-     */
-    public function getName(): ?string
+    #[Override]
+    protected function searchKeywords(string $attribute): string
     {
-        return Craft::t('digital-products', 'License');
+        return match ($attribute) {
+            'licensedTo' => $this->getLicensedTo(),
+            'productName' => $this->getProductName(),
+            default => parent::searchKeywords($attribute),
+        };
     }
 
-    /**
-     * @inheritdoc
-     */
-    public static function hasStatuses(): bool
-    {
-        return true;
-    }
-
-    /**
-     * @inheritdoc
-     */
-    public static function defineSources(string $context = null): array
-    {
-        $productTypes = DigitalProducts::getInstance()->getProductTypes()->getAllProductTypes();
-
-        $productTypeIds = [];
-
-        foreach ($productTypes as $productType) {
-            $productTypeIds[] = $productType->id;
-        }
-
-        $sources = [
-            '*' => [
-                'label' => Craft::t('digital-products', 'All product types'),
-                'criteria' => ['typeId' => $productTypeIds],
-                'defaultSort' => ['dateCreated', 'desc'],
-            ],
-        ];
-
-        $sources[] = ['heading' => Craft::t('digital-products', 'Product Types')];
-
-        foreach ($productTypes as $productType) {
-            $key = 'productType:' . $productType->id;
-
-            $sources[$key] = [
-                'key' => $key,
-                'label' => $productType->name,
-                'data' => [
-                    'handle' => $productType->handle,
-                ],
-                'criteria' => ['typeId' => $productType->id],
-            ];
-        }
-
-        return $sources;
-    }
-
-    /**
-     * @inheritdoc
-     */
-    public static function eagerLoadingMap(array $sourceElements, string $handle): array|false|null
-    {
-        $sourceElementIds = ArrayHelper::getColumn($sourceElements, 'id');
-
-        if ($handle === 'product') {
-            $map = (new Query())
-                ->select('id as source, productId as target')
-                ->from('{{%digitalproducts_licenses}}')
-                ->where(['in', 'id', $sourceElementIds])
-                ->all();
-
-            return [
-                'elementType' => Product::class,
-                'map' => $map,
-            ];
-        }
-
-        if ($handle === 'order') {
-            $map = (new Query())
-                ->select('id as source, orderId as target')
-                ->from('{{%digitalproducts_licenses}}')
-                ->where(['in', 'id', $sourceElementIds])
-                ->andWhere(['not', ['orderId' => null]])
-                ->all();
-
-            return [
-                'elementType' => Order::class,
-                'map' => $map,
-            ];
-        }
-
-        if ($handle === 'owner') {
-            $map = (new Query())
-                ->select('id as source, userId as target')
-                ->from('{{%digitalproducts_licenses}}')
-                ->where(['in', 'id', $sourceElementIds])
-                ->andWhere(['not', ['userId' => null]])
-                ->all();
-
-            return [
-                'elementType' => User::class,
-                'map' => $map,
-            ];
-        }
-
-        return parent::eagerLoadingMap($sourceElements, $handle);
-    }
-
-    /**
-     * @param string $handle
-     * @param array|Product[]|User[]|Order[] $elements
-     * @param EagerLoadPlan $plan
-     */
-    public function setEagerLoadedElements(string $handle, array $elements, EagerLoadPlan $plan): void
-    {
-        if ($handle === 'product') {
-            $this->_product = $elements[0] ?? null;
-            return;
-        }
-
-        if ($handle === 'owner') {
-            $this->_user = $elements[0] ?? null;
-            return;
-        }
-
-        if ($handle === 'order') {
-            $this->_order = $elements[0] ?? null;
-            return;
-        }
-
-        parent::setEagerLoadedElements($handle, $elements, $plan);
-    }
-
-    /**
-     * @inheritdoc
-     */
-    public function rules(): array
-    {
-        $rules = parent::rules();
-
-        $rules[] = [['productId'], 'required', 'on' => self::SCENARIO_LIVE];
-        $rules[] = [
-            'userId',
-            'required',
-            'message' => Craft::t('digital-products', 'A license must have either an email or an owner assigned to it.'),
-            'when' => function($model) {
-                return empty($model->ownerEmail);
-            },
-            'on' => self::SCENARIO_LIVE,
-        ];
-
-        return $rules;
-    }
-
-    /**
-     * @inheritdoc
-     */
-    public static function hasContent(): bool
-    {
-        return true;
-    }
-
-    /**
-     * @inheritdoc
-     */
-    public function getFieldLayout(): ?FieldLayout
-    {
-        return Craft::$app->getFields()->getLayoutByType(self::class);
-    }
-
-    /**
-     * @inheritdoc
-     * @return LicenseQuery The newly created [[LicenseQuery]] instance.
-     */
-    public static function find(): LicenseQuery
-    {
-        return new LicenseQuery(static::class);
-    }
-
-    /**
-     * @inheritdoc
-     */
+    #[Override]
     public function afterSave(bool $isNew): void
     {
-        if (!$this->propagating) {
-            if (!$isNew) {
-                $licenseRecord = LicenseRecord::findOne($this->id);
+        if (! $this->propagating) {
+            $record = $isNew ? null : LicenseRecord::query()->find($this->id);
 
-                if (!$licenseRecord) {
-                    throw new InvalidConfigException('Invalid license id: ' . $this->id);
-                }
-            } else {
-                $licenseRecord = new LicenseRecord();
-                $licenseRecord->id = $this->id;
+            if (! $isNew && ! $record) {
+                throw new RuntimeException('Invalid license ID: '.$this->id);
             }
 
+            $record ??= new LicenseRecord(['id' => $this->id]);
+
             if ($this->userId) {
-                $user = Craft::$app->getUsers()->getUserById($this->userId);
+                $user = app(Users::class)->getUserById($this->userId);
             } elseif ($this->ownerEmail) {
-                $user = User::find()->email($this->ownerEmail)->one();
+                $user = User::find()->email($this->ownerEmail)->status(null)->one();
             } else {
                 $user = null;
             }
 
-            // Assign the license to a user if config allows for it, user id is left null and email matches
-            if (DigitalProducts::getInstance()->getSettings()->autoAssignUserOnPurchase && $this->userId === null && $user) {
+            // Assign the license to the user with a matching email, if the settings allow it
+            if ($this->userId === null && $user && app(Settings::class)->autoAssignUserOnPurchase) {
                 $this->userId = $user->id;
             }
 
-            $licenseRecord->ownerName = $user ? $user->name : $this->ownerName;
-            $licenseRecord->ownerEmail = $user ? $user->email : $this->ownerEmail;
-            $licenseRecord->userId = $this->userId;
+            $record->ownerName = $user ? $user->getName() : $this->ownerName;
+            $record->ownerEmail = $user ? $user->email : $this->ownerEmail;
+            $record->userId = $this->userId;
 
-            // Some properties of the license are immutable once set
+            // The order is immutable once set
             if ($isNew) {
-                $licenseRecord->orderId = $this->orderId;
+                $record->orderId = $this->orderId;
             }
 
-            if ($isNew || $licenseRecord->productId === null) {
-                $licenseRecord->productId = $this->productId;
-                $licenseRecord->licenseKey = $this->generateKey();
+            // The product and key are set once. A license created in the control panel has no product
+            // until it is first saved with one, so it holds a temporary key until then.
+            if ($isNew || $record->productId === null) {
+                $record->productId = $this->productId;
+                $record->licenseKey = $this->productId
+                    ? app(Licenses::class)->generateLicenseKeyFor($this)
+                    : ($this->hasLicenseKey() ? $this->licenseKey : Licenses::TEMP_KEY_PREFIX.Str::random(24));
+                $this->licenseKey = $record->licenseKey;
             }
 
-            $licenseRecord->dateUpdated = $this->dateUpdated;
-            $licenseRecord->dateCreated = $this->dateCreated;
+            $record->dateCreated = Query::prepareDateForDb($this->dateCreated ?? now());
+            $record->dateUpdated = Query::prepareDateForDb($this->dateUpdated ?? now());
 
-            $dirtyAttributes = array_keys($licenseRecord->getDirtyAttributes());
-            $licenseRecord->save(false);
+            $dirtyAttributes = array_keys($record->getDirty());
+            $record->save();
 
             $this->setDirtyAttributes($dirtyAttributes);
         }
 
         parent::afterSave($isNew);
-    }
-
-    /**
-     * Generate a new license key.
-     *
-     * @return string
-     */
-    protected function generateKey(): string
-    {
-        // Use a manually-provided key if one was set before save
-        if ($this->licenseKey) {
-            return $this->licenseKey;
-        }
-
-        $generateKeyEvent = new GenerateKeyEvent(['license' => $this]);
-
-        // Raising the 'beforeGenerateLicenseKey' event
-        if ($this->hasEventHandlers(self::EVENT_GENERATE_LICENSE_KEY)) {
-            $this->trigger(self::EVENT_GENERATE_LICENSE_KEY, $generateKeyEvent);
-        }
-
-        // If a plugin provided the license key - use that.
-        if ($generateKeyEvent->licenseKey !== null) {
-            return $generateKeyEvent->licenseKey;
-        }
-
-        do {
-            $licenseKey = DigitalProducts::getInstance()->getLicenses()->generateLicenseKey();
-        } while (!DigitalProducts::getInstance()->getLicenses()->isLicenseKeyUnique($licenseKey));
-
-        return $licenseKey;
-    }
-
-    /**
-     * @inheritdoc
-     */
-    protected static function defineTableAttributes(): array
-    {
-        return [
-            'product' => ['label' => Craft::t('digital-products', 'Licensed Product')],
-            'productType' => ['label' => Craft::t('digital-products', 'Product Type')],
-            'dateCreated' => ['label' => Craft::t('digital-products', 'License Issue Date')],
-            'licensedTo' => ['label' => Craft::t('digital-products', 'Licensed To')],
-            'orderLink' => ['label' => Craft::t('digital-products', 'Associated Order')],
-        ];
-    }
-
-    /**
-     * @inheritdoc
-     */
-    protected static function defineDefaultTableAttributes(string $source): array
-    {
-        $attributes = [];
-
-        if ($source === '*') {
-            $attributes[] = 'productType';
-        }
-
-        $attributes[] = 'product';
-        $attributes[] = 'dateCreated';
-        $attributes[] = 'licensedTo';
-        $attributes[] = 'orderLink';
-
-
-        return $attributes;
-    }
-
-    /**
-     * @inheritdoc
-     */
-    protected static function defineSearchableAttributes(): array
-    {
-        return ['licensedTo', 'productName'];
-    }
-
-    /**
-     * @inheritdoc
-     */
-    protected function attributeHtml(string $attribute): string
-    {
-        switch ($attribute) {
-            case 'productType':
-                return $this->getProductType();
-
-            case 'licensedTo':
-                return $this->getLicensedTo();
-
-            case 'orderLink':
-                $url = $this->getOrderEditUrl();
-
-                return $url ? '<a href="' . $url . '">' . Craft::t('digital-products', 'View order') . '</a>' : '';
-
-            default:
-                {
-                    return parent::attributeHtml($attribute);
-                }
-        }
-    }
-
-    /**
-     * @inheritdoc
-     */
-    protected static function defineSortOptions(): array
-    {
-        return [
-            'slug' => Craft::t('digital-products', 'Product name'),
-            'ownerEmail' => Craft::t('digital-products', 'Owner'),
-            [
-                'label' => Craft::t('digital-products', 'License issue date'),
-                'orderBy' => 'dateCreated',
-                'defaultDir' => 'desc',
-            ],
-        ];
-    }
-
-    /**
-     * @inheritdoc
-     */
-    protected static function prepElementQueryForTableAttribute(ElementQueryInterface $elementQuery, string $attribute): void
-    {
-        /** @var ElementQuery $elementQuery */
-        if ($attribute === 'product') {
-            $with = $elementQuery->with ?: [];
-            $with[] = 'product';
-            $elementQuery->with = $with;
-            return;
-        }
-
-        if ($attribute === 'licensedTo') {
-            $with = $elementQuery->with ?: [];
-            $with[] = 'owner';
-            $elementQuery->with = $with;
-            return;
-        }
-
-        parent::prepElementQueryForTableAttribute($elementQuery, $attribute);
-    }
-
-
-    /**
-     * @inheritdoc
-     */
-    public function canView(User $user): bool
-    {
-        return $this->_canManageProductType($user);
-    }
-
-    /**
-     * @inheritdoc
-     */
-    public function canSave(User $user): bool
-    {
-        return $this->_canManageProductType($user);
-    }
-
-    /**
-     * @inheritdoc
-     */
-    public function canDelete(User $user): bool
-    {
-        return $this->_canManageProductType($user);
-    }
-
-    /**
-     * @param User $user
-     * @return bool
-     */
-    private function _canManageProductType(User $user): bool
-    {
-        if (parent::canView($user)) {
-            return true;
-        }
-
-        try {
-            $productType = $this->getProductType();
-        } catch (\Exception) {
-            return false;
-        }
-
-        return $user->can('digitalProducts-manageLicenses');
     }
 }

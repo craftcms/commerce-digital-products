@@ -1,47 +1,28 @@
 <?php
-/**
- * @link https://craftcms.com/
- * @copyright Copyright (c) Pixel & Tonic, Inc.
- * @license https://craftcms.github.io/license/
- */
 
-namespace craft\digitalproducts\fieldlayoutelements;
+declare(strict_types=1);
 
-use craft\base\ElementInterface;
-use craft\digitalproducts\elements\Product;
-use craft\fieldlayoutelements\TitleField;
-use craft\helpers\Html;
-use yii\base\InvalidArgumentException;
+namespace CraftCms\DigitalProducts\FieldLayoutElements;
+
+use CraftCms\Cms\FieldLayout\FieldLayoutElementContext;
+use CraftCms\Cms\FieldLayout\LayoutElements\TitleField;
+use CraftCms\Cms\Ui\Contracts\Control;
+use CraftCms\DigitalProducts\Elements\Product;
+use InvalidArgumentException;
+use Override;
 
 /**
- * ProductTitleField represents a Title field that can be included within a product type’s product field layout designer.
- *
- * @author Pixel & Tonic, Inc. <support@pixelandtonic.com>
- * @since 3.0
+ * The Title field in digital product field layouts.
  */
 class ProductTitleField extends TitleField
 {
-    /**
-     * @inheritdoc
-     */
-    protected function selectorInnerHtml(): string
+    #[Override]
+    protected function uiControl(FieldLayoutElementContext $context): ?Control
     {
-        return
-            Html::tag('span', '', [
-                'class' => ['fld-product-title-field-icon', 'fld-field-hidden', 'hidden'],
-            ]) .
-            parent::selectorInnerHtml();
-    }
-
-    /**
-     * @inheritdoc
-     */
-    public function inputHtml(ElementInterface $element = null, bool $static = false): ?string
-    {
-        if (!$element instanceof Product) {
-            throw new InvalidArgumentException('ProductTitleField can only be used in product field layouts.');
+        if ($context->element !== null && ! $context->element instanceof Product) {
+            throw new InvalidArgumentException(sprintf('%s can only be used in digital product field layouts.', self::class));
         }
 
-        return parent::inputHtml($element, $static);
+        return parent::uiControl($context);
     }
 }

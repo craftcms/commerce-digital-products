@@ -1,22 +1,19 @@
 <?php
-/**
- * @link https://craftcms.com/
- * @copyright Copyright (c) Pixel & Tonic, Inc.
- * @license https://craftcms.github.io/license/
- */
 
-namespace craft\digitalproducts\db;
+declare(strict_types=1);
+
+namespace CraftCms\DigitalProducts\Database;
 
 /**
- * This class provides public constants for defining Digital Products’ database table names. Do not use these in migrations.
- *
- * @author Pixel & Tonic, Inc. <support@pixelandtonic.com>
- * @since 4.0
+ * The Digital Products database tables (unprefixed; the connection adds the table prefix).
  */
 abstract class Table
 {
-    public const LICENSES = '{{%digitalproducts_licenses}}';
-    public const PRODUCTS = '{{%digitalproducts_products}}';
-    public const PRODUCT_TYPES = '{{%digitalproducts_producttypes}}';
-    public const PRODUCT_TYPES_SITES = '{{%digitalproducts_producttypes_sites}}';
+    public const string LICENSES = 'digitalproducts_licenses';
+
+    public const string PRODUCTS = 'digitalproducts_products';
+
+    public const string PRODUCT_TYPES = 'digitalproducts_producttypes';
+
+    public const string PRODUCT_TYPES_SITES = 'digitalproducts_producttypes_sites';
 }

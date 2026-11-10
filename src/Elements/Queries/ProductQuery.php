@@ -1,172 +1,124 @@
 <?php
 
-namespace craft\digitalproducts\elements\db;
+declare(strict_types=1);
 
-use Craft;
-use craft\commerce\elements\db\PurchasableQuery;
-use craft\db\Query;
-use craft\db\QueryAbortedException;
-use craft\digitalproducts\elements\Product;
-use craft\digitalproducts\models\ProductType;
-use craft\digitalproducts\Plugin as DigitalProducts;
-use craft\helpers\ArrayHelper;
-use craft\helpers\Db;
-use DateTime;
-use yii\db\Connection;
+namespace CraftCms\DigitalProducts\Elements\Queries;
+
+use Closure;
+use CraftCms\Cms\Element\Queries\Exceptions\QueryAbortedException;
+use CraftCms\Cms\Support\Arr;
+use CraftCms\Commerce\Purchasable\Queries\PurchasableQuery;
+use CraftCms\DigitalProducts\Data\ProductType;
+use CraftCms\DigitalProducts\Database\Table;
+use CraftCms\DigitalProducts\Elements\Product;
+use CraftCms\DigitalProducts\ProductTypes;
+use DateTimeInterface;
+use Illuminate\Database\Query\Builder;
+use Illuminate\Support\Facades\DB;
+use Override;
+use Tpetry\QueryExpressions\Language\Alias;
+
+use function CraftCms\Cms\currentUser;
 
 /**
- * ProductQuery represents a SELECT SQL statement for products in a way that is independent of DBMS.
+ * Queries digital products.
  *
- * @method Product[]|array all($db = null)
- * @method Product|array|false one($db = null)
- * @method Product|array|false nth(int $n, Connection $db = null)
+ * @extends PurchasableQuery<Product>
  *
- * @author Pixel & Tonic, Inc. <support@pixelandtonic.com>
- * @since  2.0
+ * @method Product|null one($db = null)
+ * @method Product[] all($db = null)
  */
 class ProductQuery extends PurchasableQuery
 {
-    /**
-     * @var bool Whether to only return products that the user has permission to edit.
-     */
-    public bool $editable = false;
+    #[Override]
+    protected array $defaultOrderBy = [
+        Table::PRODUCTS.'.postDate' => SORT_DESC,
+        'elements.id' => SORT_DESC,
+    ];
 
-    /**
-     * @var mixed The Post Date that the resulting products must have.
-     */
-    public mixed $expiryDate = null;
+    /** Whether to only return products the current user can manage. */
+    public ?bool $editable = null;
 
-    /**
-     * @var mixed The Post Date that the resulting products must have.
-     */
+    public mixed $typeId = null;
+
     public mixed $postDate = null;
 
-    /**
-     * @var int|int[]|null The product type ID(s) that the resulting products must have.
-     */
-    public array|int|null $typeId = null;
+    public mixed $expiryDate = null;
 
-    /**
-     * @inheritdoc
-     */
-    public function __construct(string $elementType, array $config = [])
+    /** @param array<string, mixed> $config */
+    public function __construct(array $config = [])
     {
         // Default status
-        if (!isset($config['status'])) {
-            $config['status'] = Product::STATUS_LIVE;
+        if (! isset($config['status'])) {
+            $config['status'] = [Product::STATUS_LIVE];
         }
 
-        parent::__construct($elementType, $config);
+        parent::__construct(Product::class, $config);
+
+        $this->query->join(new Alias(Table::PRODUCTS, Table::PRODUCTS), Table::PRODUCTS.'.id', '=', 'elements.id');
+
+        $this->query->addSelect([
+            Table::PRODUCTS.'.typeId',
+            Table::PRODUCTS.'.postDate',
+            Table::PRODUCTS.'.expiryDate',
+        ]);
+
+        $this->beforeQuery(static function (self $query) {
+            $query->normalizeTypeId();
+
+            // See if `type` was set to an invalid handle
+            if ($query->typeId === []) {
+                throw new QueryAbortedException;
+            }
+
+            if ($query->typeId) {
+                $query->whereIn(Table::PRODUCTS.'.typeId', $query->typeId);
+            }
+
+            if (isset($query->postDate)) {
+                $query->whereDateParam(Table::PRODUCTS.'.postDate', $query->postDate);
+            }
+
+            if (isset($query->expiryDate)) {
+                $query->whereDateParam(Table::PRODUCTS.'.expiryDate', $query->expiryDate);
+            }
+
+            if ($query->editable) {
+                if (! currentUser()) {
+                    throw new QueryAbortedException;
+                }
+
+                $query->whereIn(Table::PRODUCTS.'.typeId', app(ProductTypes::class)->getEditableProductTypeIds());
+            }
+        });
     }
 
     /**
-     * @inheritdoc
+     * Narrows the query results to products the current user can manage.
      */
-    public function __set($name, $value)
-    {
-        switch ($name) {
-            case 'type':
-                $this->type($value);
-                break;
-            case 'before':
-                $this->before($value);
-                break;
-            case 'after':
-                $this->after($value);
-                break;
-            default:
-                parent::__set($name, $value);
-        }
-    }
-
-    /**
-     * Sets the [[postDate]] property to only allow products whose Post Date is before the given value.
-     *
-     * @param DateTime|string $value The property value
-     * @return static self reference
-     */
-    public function before(DateTime|string $value): ProductQuery
-    {
-        if ($value instanceof DateTime) {
-            $value = $value->format(DateTime::W3C);
-        }
-
-        $this->postDate = ArrayHelper::toArray($this->postDate);
-        $this->postDate[] = '<' . $value;
-
-        return $this;
-    }
-
-    /**
-     * Sets the [[postDate]] property to only allow products whose Post Date is after the given value.
-     *
-     * @param DateTime|string $value The property value
-     * @return static self reference
-     */
-    public function after(DateTime|string $value): ProductQuery
-    {
-        if ($value instanceof DateTime) {
-            $value = $value->format(DateTime::W3C);
-        }
-
-        $this->postDate = ArrayHelper::toArray($this->postDate);
-        $this->postDate[] = '>=' . $value;
-
-        return $this;
-    }
-
-    /**
-     * Sets the [[editable]] property.
-     *
-     * @param bool $value The property value (defaults to true)
-     * @return static self reference
-     */
-    public function editable(bool $value = true): ProductQuery
+    public function editable(?bool $value = true): static
     {
         $this->editable = $value;
+
         return $this;
     }
 
     /**
-     * Sets the [[expiryDate]] property.
-     *
-     * @param mixed $value The property value
-     * @return static self reference
+     * Narrows the query results based on the product types, by handle or {@see ProductType}.
      */
-    public function expiryDate(mixed $value): ProductQuery
+    public function type(mixed $value): static
     {
-        $this->expiryDate = $value;
-        return $this;
-    }
+        if (is_string($value) && ($productType = app(ProductTypes::class)->getProductTypeByHandle($value))) {
+            $value = $productType;
+        }
 
-    /**
-     * Sets the [[postDate]] property.
-     *
-     * @param mixed $value The property value
-     * @return static self reference
-     */
-    public function postDate(mixed $value): ProductQuery
-    {
-        $this->postDate = $value;
-        return $this;
-    }
-
-    /**
-     * Sets the [[typeId]] property based on a given product types(s)'s handle(s).
-     *
-     * @param mixed $value The property value
-     * @return static self reference
-     */
-    public function type(mixed $value): ProductQuery
-    {
         if ($value instanceof ProductType) {
-            $this->typeId = $value->id;
+            $this->typeId = [$value->id];
         } elseif ($value !== null) {
-            $this->typeId = (new Query())
-                ->select(['id'])
-                ->from(['{{%digitalproducts_producttypes}}'])
-                ->where(Db::parseParam('handle', $value))
-                ->column();
+            $this->typeId = DB::table(Table::PRODUCT_TYPES)
+                ->whereParam('handle', $value)
+                ->pluck('id')
+                ->all();
         } else {
             $this->typeId = null;
         }
@@ -175,125 +127,103 @@ class ProductQuery extends PurchasableQuery
     }
 
     /**
-     * Sets the [[typeId]] property.
-     *
-     * @param int|int[]|null $value The property value
-     * @return static self reference
+     * Narrows the query results based on the product type IDs.
      */
-    public function typeId(array|int|null $value): ProductQuery
+    public function typeId(mixed $value): static
     {
         $this->typeId = $value;
+
         return $this;
     }
 
-    // Protected Methods
-    // =========================================================================
-
-    /**
-     * @inheritdoc
-     */
-    protected function beforePrepare(): bool
+    public function postDate(mixed $value): static
     {
-        // See if 'type' were set to invalid handles
-        if ($this->typeId === []) {
-            return false;
-        }
+        $this->postDate = $value;
 
-        $this->joinElementTable('digitalproducts_products');
+        return $this;
+    }
 
-        $this->query->addSelect([
-            'digitalproducts_products.expiryDate',
-            'digitalproducts_products.id',
-            'digitalproducts_products.postDate',
-            'digitalproducts_products.promotable',
-            'digitalproducts_products.taxCategoryId',
-            'digitalproducts_products.typeId',
-        ]);
+    public function expiryDate(mixed $value): static
+    {
+        $this->expiryDate = $value;
 
-        if ($this->expiryDate) {
-            $this->subQuery->andWhere(Db::parseDateParam('digitalproducts_products.expiryDate', $this->expiryDate));
-        }
-
-        if ($this->postDate) {
-            $this->subQuery->andWhere(Db::parseDateParam('digitalproducts_products.postDate', $this->postDate));
-        }
-
-        if ($this->typeId) {
-            $this->subQuery->andWhere(Db::parseParam('digitalproducts_products.typeId', $this->typeId));
-        }
-
-        $this->_applyEditableParam();
-
-        return parent::beforePrepare();
+        return $this;
     }
 
     /**
-     * @inheritdoc
+     * Narrows the query results to products posted before the given date.
      */
-    protected function statusCondition(string $status): mixed
+    public function before(DateTimeInterface|string $value): static
     {
-        $currentTimeDb = Db::prepareDateForDb(new DateTime());
-
-        switch ($status) {
-            case Product::STATUS_LIVE:
-                return [
-                    'and',
-                    [
-                        'elements.enabled' => '1',
-                        'elements_sites.enabled' => '1',
-                    ],
-                    ['<=', 'digitalproducts_products.postDate', $currentTimeDb],
-                    [
-                        'or',
-                        ['digitalproducts_products.expiryDate' => null],
-                        ['>', 'digitalproducts_products.expiryDate', $currentTimeDb],
-                    ],
-                ];
-            case Product::STATUS_PENDING:
-                return [
-                    'and',
-                    [
-                        'elements.enabled' => '1',
-                        'elements_sites.enabled' => '1',
-                    ],
-                    ['>', 'digitalproducts_products.postDate', $currentTimeDb],
-                ];
-            case Product::STATUS_EXPIRED:
-                return [
-                    'and',
-                    [
-                        'elements.enabled' => '1',
-                        'elements_sites.enabled' => '1',
-                    ],
-                    ['not', ['digitalproducts_products.expiryDate' => null]],
-                    ['<=', 'digitalproducts_products.expiryDate', $currentTimeDb],
-                ];
-            default:
-                return parent::statusCondition($status);
+        if ($value instanceof DateTimeInterface) {
+            $value = $value->format(DateTimeInterface::W3C);
         }
+
+        $this->postDate = Arr::wrap($this->postDate);
+        $this->postDate[] = '<'.$value;
+
+        return $this;
     }
 
     /**
-     * Applies the 'editable' param to the query being prepared.
-     *
-     * @return void
-     * @throws QueryAbortedException
+     * Narrows the query results to products posted on or after the given date.
      */
-    private function _applyEditableParam(): void
+    public function after(DateTimeInterface|string $value): static
     {
-        if (!$this->editable) {
-            return;
+        if ($value instanceof DateTimeInterface) {
+            $value = $value->format(DateTimeInterface::W3C);
         }
 
-        $user = Craft::$app->getUser()->getIdentity();
+        $this->postDate = Arr::wrap($this->postDate);
+        $this->postDate[] = '>='.$value;
 
-        if (!$user) {
-            throw new QueryAbortedException();
+        return $this;
+    }
+
+    #[Override]
+    protected function statusCondition(string $status): Closure
+    {
+        // Treat “now” as the end of the current minute to keep queries cacheable
+        $currentTime = now()->endOfMinute()->setTimezone('UTC');
+
+        return match ($status) {
+            Product::STATUS_LIVE => fn (Builder $query) => $query
+                ->whereBool('elements.enabled', true)
+                ->whereBool('elements_sites.enabled', true)
+                ->where(Table::PRODUCTS.'.postDate', '<=', $currentTime)
+                ->where(fn (Builder $query) => $query
+                    ->whereNull(Table::PRODUCTS.'.expiryDate')
+                    ->orWhere(Table::PRODUCTS.'.expiryDate', '>', $currentTime)),
+            Product::STATUS_PENDING => fn (Builder $query) => $query
+                ->whereBool('elements.enabled', true)
+                ->whereBool('elements_sites.enabled', true)
+                ->where(Table::PRODUCTS.'.postDate', '>', $currentTime),
+            Product::STATUS_EXPIRED => fn (Builder $query) => $query
+                ->whereBool('elements.enabled', true)
+                ->whereBool('elements_sites.enabled', true)
+                ->whereNotNull(Table::PRODUCTS.'.expiryDate')
+                ->where(Table::PRODUCTS.'.expiryDate', '<=', $currentTime),
+            default => parent::statusCondition($status),
+        };
+    }
+
+    #[Override]
+    protected function cacheTags(): array
+    {
+        return array_map(fn ($typeId) => "digitalProductType:$typeId", Arr::wrap($this->typeId));
+    }
+
+    private function normalizeTypeId(): void
+    {
+        if (empty($this->typeId)) {
+            $this->typeId = is_array($this->typeId) ? [] : null;
+        } elseif (is_numeric($this->typeId)) {
+            $this->typeId = [(int) $this->typeId];
+        } elseif (! is_array($this->typeId) || ! Arr::isNumeric($this->typeId)) {
+            $this->typeId = DB::table(Table::PRODUCT_TYPES)
+                ->whereParam('id', $this->typeId)
+                ->pluck('id')
+                ->all();
         }
-
-        // Limit the query to only the sections the user has permission to edit
-        $this->subQuery->andWhere([
-            'digitalproducts_products.typeId' => DigitalProducts::getInstance()->getProductTypes()->getEditableProductTypeIds(),
-        ]);
     }
 }

@@ -1,30 +1,32 @@
 <?php
-/**
- * @link https://craftcms.com/
- * @copyright Copyright (c) Pixel & Tonic, Inc.
- * @license https://craftcms.github.io/license/
- */
 
-namespace craft\digitalproducts\helpers;
+declare(strict_types=1);
 
-use craft\helpers\Gql as GqlHelper;
+namespace CraftCms\DigitalProducts\Support;
 
-/**
- * Class Commerce Gql
- *
- * @author Pixel & Tonic, Inc. <support@pixelandtonic.com>
- * @since 2.4
- */
+use CraftCms\Cms\Gql\Data\GqlSchema;
+use CraftCms\Cms\Gql\GqlHelper;
+use CraftCms\DigitalProducts\Data\ProductType;
+use CraftCms\DigitalProducts\ProductTypes;
+
 class Gql extends GqlHelper
 {
     /**
-     * Return true if active schema can query products.
-     *
-     * @return bool
+     * Whether the current schema can query digital products.
      */
     public static function canQueryProducts(): bool
     {
-        $allowedEntities = self::extractAllowedEntitiesFromSchema();
-        return isset($allowedEntities['digitalProductTypes']);
+        return isset(self::extractAllowedEntitiesFromSchema()['digitalProductTypes']);
+    }
+
+    /**
+     * @return ProductType[] The product types the schema can read.
+     */
+    public static function getSchemaContainedProductTypes(?GqlSchema $schema = null): array
+    {
+        return array_values(array_filter(
+            app(ProductTypes::class)->getAllProductTypes(),
+            fn (ProductType $productType) => static::isSchemaAwareOf("digitalProductTypes.$productType->uid", $schema),
+        ));
     }
 }

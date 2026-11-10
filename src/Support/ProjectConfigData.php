@@ -1,119 +1,78 @@
 <?php
+
+declare(strict_types=1);
+
+namespace CraftCms\DigitalProducts\Support;
+
+use CraftCms\Cms\Database\Table as CraftTable;
+use CraftCms\Cms\Support\Facades\Fields;
+use CraftCms\DigitalProducts\Database\Table;
+use CraftCms\DigitalProducts\Elements\License;
+use Illuminate\Support\Facades\DB;
+
 /**
- * @link https://craftcms.com/
- * @copyright Copyright (c) Pixel & Tonic, Inc.
- * @license https://craftcms.github.io/license/
- */
-
-namespace craft\digitalproducts\helpers;
-
-use Craft;
-use craft\db\Query;
-use craft\digitalproducts\elements\License;
-
-/**
- * Class ProjectConfigData
- *
- * @author Pixel & Tonic, Inc. <support@pixelandtonic.com>
- * @since 2.2
+ * Builds the `digital-products` project config from the database, for project config rebuilds.
  */
 class ProjectConfigData
 {
-    // Project config rebuild methods
-    // -------------------------------------------------------------------------
-
     /**
-     * Return a rebuilt project config array
-     *
-     * @return array
+     * @return array<string, mixed>
      */
     public static function rebuildProjectConfig(): array
     {
-        $output = [];
-        $output['productTypes'] = self::_getProductTypeData();
+        $output = ['productTypes' => self::productTypeData()];
 
-        $licenseFieldLayout = self::_getLicenseFieldLayoutData();
-        if ($licenseFieldLayout !== null) {
-            $output['licenseFieldLayouts'] = $licenseFieldLayout;
+        $licenseLayout = Fields::getLayoutByType(License::class, false);
+
+        if ($licenseLayout?->id) {
+            $output['licenseFieldLayouts'] = [$licenseLayout->uid => $licenseLayout->getConfig()];
         }
 
         return $output;
     }
 
     /**
-     * Return license field layout data for project config.
-     *
-     * @return array|null
+     * @return array<string, array<string, mixed>>
      */
-    private static function _getLicenseFieldLayoutData(): ?array
+    private static function productTypeData(): array
     {
-        $layout = Craft::$app->getFields()->getLayoutByType(License::class);
-        if ($layout->id) {
-            return [$layout->uid => $layout->getConfig()];
-        }
-        return null;
-    }
+        $data = [];
 
-    /**
-     * Return product type data config array.
-     *
-     * @return array
-     */
-    private static function _getProductTypeData(): array
-    {
-        $productTypeRows = (new Query())
-            ->select([
-                'fieldLayoutId',
-                'name',
-                'handle',
-                'skuFormat',
-                'uid',
-            ])
-            ->from(['{{%digitalproducts_producttypes}} productTypes'])
-            ->all();
+        foreach (DB::table(Table::PRODUCT_TYPES)->get() as $row) {
+            $config = [
+                'name' => $row->name,
+                'handle' => $row->handle,
+                'skuFormat' => $row->skuFormat,
+                'siteSettings' => [],
+            ];
 
-        $typeData = [];
-
-        foreach ($productTypeRows as $productTypeRow) {
-            $rowUid = $productTypeRow['uid'];
-
-            if (!empty($productTypeRow['fieldLayoutId'])) {
-                $layout = Craft::$app->getFields()->getLayoutById($productTypeRow['fieldLayoutId']);
-
-                if ($layout) {
-                    $productTypeRow['fieldLayouts'] = [$layout->uid => $layout->getConfig()];
-                }
+            if ($row->fieldLayoutId && ($layout = Fields::getLayoutById((int) $row->fieldLayoutId))) {
+                $config['fieldLayouts'] = [$layout->uid => $layout->getConfig()];
             }
 
-            unset($productTypeRow['uid'], $productTypeRow['fieldLayoutId']);
-
-            $productTypeRow['siteSettings'] = [];
-            $typeData[$rowUid] = $productTypeRow;
+            $data[$row->uid] = $config;
         }
 
-        $productTypeSiteRows = (new Query())
+        $siteRows = DB::table(Table::PRODUCT_TYPES_SITES, 'producttypes_sites')
+            ->join(CraftTable::SITES.' as sites', 'sites.id', '=', 'producttypes_sites.siteId')
+            ->join(Table::PRODUCT_TYPES.' as producttypes', 'producttypes.id', '=', 'producttypes_sites.productTypeId')
             ->select([
                 'producttypes_sites.hasUrls',
                 'producttypes_sites.uriFormat',
                 'producttypes_sites.template',
-                'sites.uid AS siteUid',
-                'producttypes.uid AS typeUid',
+                'sites.uid as siteUid',
+                'producttypes.uid as typeUid',
             ])
-            ->from(['{{%digitalproducts_producttypes_sites}} producttypes_sites'])
-            ->innerJoin('{{%sites}} sites', '[[sites.id]] = [[producttypes_sites.siteId]]')
-            ->innerJoin('{{%digitalproducts_producttypes}} producttypes', '[[producttypes.id]] = [[producttypes_sites.productTypeId]]')
-            ->all();
+            ->get();
 
-        foreach ($productTypeSiteRows as $productTypeSiteRow) {
-            $typeUid = $productTypeSiteRow['typeUid'];
-            $siteUid = $productTypeSiteRow['siteUid'];
-            unset($productTypeSiteRow['siteUid'], $productTypeSiteRow['typeUid']);
-
-            $productTypeSiteRow['hasUrls'] = (bool)$productTypeSiteRow['hasUrls'];
-
-            $typeData[$typeUid]['siteSettings'][$siteUid] = $productTypeSiteRow;
+        foreach ($siteRows as $row) {
+            $data[$row->typeUid]['siteSettings'][$row->siteUid] = [
+                'hasUrls' => (bool) $row->hasUrls,
+                'uriFormat' => $row->uriFormat,
+                'template' => $row->template,
+            ];
         }
 
-        return $typeData;
+        return $data;
     }
 }

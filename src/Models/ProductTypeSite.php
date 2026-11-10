@@ -1,53 +1,34 @@
 <?php
 
-namespace craft\digitalproducts\records;
+declare(strict_types=1);
 
-use craft\db\ActiveRecord;
-use craft\records\Site;
-use yii\db\ActiveQueryInterface;
+namespace CraftCms\DigitalProducts\Models;
+
+use CraftCms\Cms\Shared\BaseModel;
+use CraftCms\Cms\Shared\Concerns\HasUid;
+use CraftCms\DigitalProducts\Database\Table;
 
 /**
- * Product type site record.
+ * Row in `digitalproducts_producttypes_sites`.
  *
- * @property int $id            Setting id
- * @property int $productTypeId Product type id
- * @property int|null $siteId        Site id
- * @property string $uriFormat     Uri format
- * @property bool $hasUrls       Do products with this site/type combo have urls?
- * @property string $template      Template to use
- * @property Site $site          Site
- * @property ProductType $productType   Product Type
- *
- * @author    Pixel & Tonic, Inc. <support@pixelandtonic.com>
- * @copyright Copyright (c) 2016, Pixel & Tonic, Inc.
+ * @property int $id
+ * @property int $productTypeId
+ * @property int $siteId
+ * @property string|null $uriFormat
+ * @property string|null $template
+ * @property bool $hasUrls
  */
-class ProductTypeSite extends ActiveRecord
+class ProductTypeSite extends BaseModel
 {
-    /**
-     * @inheritdoc
-     */
-    public static function tableName(): string
-    {
-        return '{{%digitalproducts_producttypes_sites}}';
-    }
+    use HasUid;
 
-    /**
-     * Return the product type for these settings.
-     *
-     * @return ActiveQueryInterface The relational query object.
-     */
-    public function getProductType(): ActiveQueryInterface
-    {
-        return $this->hasOne(ProductType::class, ['id', 'productTypeId']);
-    }
+    #[\Override]
+    protected $table = Table::PRODUCT_TYPES_SITES;
 
-    /**
-     * Return the Site for these settings.
-     *
-     * @return ActiveQueryInterface The relational query object.
-     */
-    public function getSite(): ActiveQueryInterface
-    {
-        return $this->hasOne(Site::class, ['id', 'siteId']);
-    }
+    #[\Override]
+    protected $casts = [
+        'productTypeId' => 'integer',
+        'siteId' => 'integer',
+        'hasUrls' => 'boolean',
+    ];
 }

@@ -1,28 +1,16 @@
 <?php
-/**
- * @link https://craftcms.com/
- * @copyright Copyright (c) Pixel & Tonic, Inc.
- * @license https://craftcms.github.io/license/
- */
 
-namespace craft\digitalproducts\gql\types\elements;
+declare(strict_types=1);
 
-use craft\digitalproducts\elements\Product as ProductElement;
-use craft\digitalproducts\gql\interfaces\elements\Product as ProductInterface;
-use craft\gql\types\elements\Element as ElementType;
+namespace CraftCms\DigitalProducts\Gql\Types\Elements;
+
+use CraftCms\Cms\Gql\Types\Elements\Element;
+use CraftCms\DigitalProducts\Gql\Interfaces\Elements\Product as ProductInterface;
 use GraphQL\Type\Definition\ResolveInfo;
+use Override;
 
-/**
- * Class Product
- *
- * @author Pixel & Tonic, Inc. <support@pixelandtonic.com>
- * @since 2.4
- */
-class Product extends ElementType
+class Product extends Element
 {
-    /**
-     * @inheritdoc
-     */
     public function __construct(array $config)
     {
         $config['interfaces'] = [
@@ -32,16 +20,12 @@ class Product extends ElementType
         parent::__construct($config);
     }
 
-    /**
-     * @inheritdoc
-     */
-    protected function resolve($source, $arguments, $context, ResolveInfo $resolveInfo): mixed
+    #[Override]
+    protected function resolve(mixed $source, array $arguments, mixed $context, ResolveInfo $resolveInfo): mixed
     {
-        /** @var ProductElement $source */
-        $fieldName = $resolveInfo->fieldName;
-
-        return match ($fieldName) {
+        return match ($resolveInfo->fieldName) {
             'productTypeHandle' => $source->getType()->handle,
+            'productTypeId' => $source->typeId,
             default => parent::resolve($source, $arguments, $context, $resolveInfo),
         };
     }

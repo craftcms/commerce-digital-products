@@ -1,136 +1,209 @@
 <?php
 
-namespace craft\digitalproducts\models;
+declare(strict_types=1);
 
-use craft\base\Model;
-use craft\behaviors\FieldLayoutBehavior;
-use craft\digitalproducts\elements\Product;
-use craft\digitalproducts\Plugin as DigitalProducts;
-use craft\helpers\ArrayHelper;
-use craft\helpers\UrlHelper;
-use craft\models\FieldLayout;
+namespace CraftCms\DigitalProducts\Data;
+
+use CraftCms\Cms\Component\Component;
+use CraftCms\Cms\Database\Table as CraftTable;
+use CraftCms\Cms\Field\Contracts\FieldInterface;
+use CraftCms\Cms\FieldLayout\Contracts\FieldLayoutProviderInterface;
+use CraftCms\Cms\FieldLayout\FieldLayout;
+use CraftCms\Cms\Support\Arr;
+use CraftCms\Cms\Support\Facades\Fields;
+use CraftCms\Cms\Support\Str;
+use CraftCms\Cms\Support\Url;
+use CraftCms\DigitalProducts\Elements\Product;
+use CraftCms\DigitalProducts\ProductTypes;
+use CraftCms\DigitalProducts\Validation\ProductTypeRules;
+use CraftCms\RulesetValidation\Attributes\Ruleset;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Validator;
+use RuntimeException;
+
+use function CraftCms\Cms\t;
 
 /**
- * Product type model.
- *
- * @method null setFieldLayout(FieldLayout $fieldLayout)
- * @method FieldLayout getFieldLayout()
- * @property string $cpEditUrl
- * @property ProductTypeSite[] $siteSettings
- * @property mixed $productFieldLayout
- * @mixin FieldLayoutBehavior
- *
- * @author    Pixel & Tonic, Inc. <support@pixelandtonic.com>
- * @copyright Copyright (c) 2017, Pixel & Tonic, Inc.
+ * A digital product type.
  */
-class ProductType extends Model
+#[Ruleset(ProductTypeRules::class)]
+class ProductType extends Component implements FieldLayoutProviderInterface
 {
-    /**
-     * @var int ID
-     */
-    public $id;
+    public ?int $id = null;
 
-    /**
-     * @var int Field layout id
-     */
-    public $fieldLayoutId;
+    public ?int $fieldLayoutId = null;
 
-    /**
-     * @var string Name
-     */
-    public $name;
+    public ?string $name = null;
 
-    /**
-     * @var string Handle
-     */
-    public $handle;
+    public ?string $handle = null;
 
-    /**
-     * @var string SKU format
-     */
-    public $skuFormat;
+    public ?string $skuFormat = null;
 
-    /**
-     * @var string|null UID
-     */
-    public $uid;
+    public ?string $uid = null;
 
-    /**
-     * @var ProductTypeSite[]
-     */
-    private $_siteSettings;
+    /** @var array<int, ProductTypeSite>|null */
+    private ?array $siteSettings = null;
 
-    /**
-     * @inheritdoc
-     */
-    public function __toString()
+    private ?FieldLayout $fieldLayout = null;
+
+    public function __toString(): string
+    {
+        return (string) $this->handle;
+    }
+
+    public function getHandle(): ?string
     {
         return $this->handle;
     }
 
-    /**
-     * @return string
-     */
     public function getCpEditUrl(): string
     {
-        return UrlHelper::cpUrl('digital-products/producttypes/' . $this->id);
+        return Url::cpUrl('digital-products/producttypes/'.$this->id);
     }
 
     /**
-     * Returns the product types's site-specific settings.
-     *
-     * @return ProductTypeSite[]
+     * @return array<int, ProductTypeSite> Site settings, indexed by site ID.
      */
     public function getSiteSettings(): array
     {
-        if ($this->_siteSettings !== null) {
-            return $this->_siteSettings;
+        if ($this->siteSettings !== null) {
+            return $this->siteSettings;
         }
 
-        if (!$this->id) {
+        if (! $this->id) {
             return [];
         }
 
-        $this->setSiteSettings(ArrayHelper::index(DigitalProducts::getInstance()->getProductTypes()->getProductTypeSites($this->id), 'siteId'));
+        $this->setSiteSettings(Arr::keyBy(app(ProductTypes::class)->getProductTypeSites($this->id), 'siteId'));
 
-        return $this->_siteSettings;
+        return $this->siteSettings;
     }
 
     /**
-     * Sets the product type's site-specific settings.
-     *
-     * @param ProductTypeSite[] $siteSettings
+     * @param  array<int, ProductTypeSite>  $siteSettings
      */
-    public function setSiteSettings(array $siteSettings)
+    public function setSiteSettings(array $siteSettings): void
     {
-        $this->_siteSettings = $siteSettings;
+        $this->siteSettings = $siteSettings;
 
-        foreach ($this->_siteSettings as $settings) {
+        foreach ($this->siteSettings as $settings) {
             $settings->setProductType($this);
         }
     }
 
-    /**
-     * @return FieldLayout
-     */
-    public function getProductFieldLayout(): FieldLayout
+    /** @return int[] */
+    public function getSiteIds(): array
     {
-        /** @var FieldLayoutBehavior $behavior */
-        $behavior = $this->getBehavior('productFieldLayout');
-        return $behavior->getFieldLayout();
+        return array_keys($this->getSiteSettings());
+    }
+
+    public function getFieldLayout(): FieldLayout
+    {
+        if ($this->fieldLayout !== null) {
+            return $this->fieldLayout;
+        }
+
+        if ($this->fieldLayoutId) {
+            $fieldLayout = Fields::getLayoutById($this->fieldLayoutId, true)
+                ?? throw new RuntimeException('Invalid field layout ID: '.$this->fieldLayoutId);
+        } else {
+            $fieldLayout = new FieldLayout(['type' => Product::class]);
+        }
+
+        $fieldLayout->provider = $this;
+
+        return $this->fieldLayout = $fieldLayout;
     }
 
     /**
-     * @inheritdoc
+     * Alias of {@see getFieldLayout()}, kept for templates written against Digital Products 4.x and 5.x.
      */
-    public function behaviors(): array
+    public function getProductFieldLayout(): FieldLayout
     {
-        return [
-            'productFieldLayout' => [
-                'class' => FieldLayoutBehavior::class,
-                'elementType' => Product::class,
-                'idAttribute' => 'fieldLayoutId',
-            ],
+        return $this->getFieldLayout();
+    }
+
+    public function setFieldLayout(FieldLayout $fieldLayout): void
+    {
+        $fieldLayout->provider = $this;
+        $this->fieldLayout = $fieldLayout;
+    }
+
+    /**
+     * Returns the custom fields in the product field layout.
+     *
+     * @return FieldInterface[]
+     */
+    public function getCustomFields(): array
+    {
+        return $this->getFieldLayout()->getCustomFields();
+    }
+
+    #[\Override]
+    public function afterValidate(?Validator $validator = null): void
+    {
+        $fieldLayout = $this->getFieldLayout();
+        $fieldLayout->reservedFieldHandles = [
+            'availableForPurchase',
+            'existingLicenses',
+            'price',
+            'product',
+            'promotable',
+            'sku',
+            'type',
         ];
+
+        if (! $fieldLayout->validate()) {
+            $this->addModelErrors($fieldLayout, 'fieldLayout');
+        }
+
+        foreach ($this->getSiteSettings() as $siteSettings) {
+            if (! $siteSettings->validate()) {
+                $this->addModelErrors($siteSettings, "siteSettings[$siteSettings->siteId]");
+            }
+        }
+
+        if (empty($this->getSiteSettings())) {
+            $this->errors()->add('siteSettings', t('At least one site must be enabled for the product type.', category: 'digital-products'));
+        }
+    }
+
+    /**
+     * Returns the product type's project config data, stored at `digital-products.productTypes.{uid}`.
+     *
+     * @return array<string, mixed>
+     */
+    public function getConfig(): array
+    {
+        $config = [
+            'name' => $this->name,
+            'handle' => $this->handle,
+            'skuFormat' => $this->skuFormat,
+            'siteSettings' => [],
+        ];
+
+        $fieldLayout = $this->getFieldLayout();
+
+        if ($fieldLayoutConfig = $fieldLayout->getConfig()) {
+            if (empty($fieldLayout->id)) {
+                $fieldLayout->uid ??= (string) Str::uuid();
+                $layoutUid = $fieldLayout->uid;
+            } else {
+                $layoutUid = DB::table(CraftTable::FIELDLAYOUTS)->uidById($fieldLayout->id);
+            }
+
+            $config['fieldLayouts'] = [$layoutUid => $fieldLayoutConfig];
+        }
+
+        foreach ($this->getSiteSettings() as $siteId => $settings) {
+            $siteUid = DB::table(CraftTable::SITES)->uidById($siteId);
+            $config['siteSettings'][$siteUid] = [
+                'hasUrls' => $settings->hasUrls,
+                'uriFormat' => $settings->uriFormat,
+                'template' => $settings->template,
+            ];
+        }
+
+        return $config;
     }
 }

@@ -1,66 +1,43 @@
 <?php
 
-namespace craft\digitalproducts\records;
+declare(strict_types=1);
 
-use craft\commerce\records\TaxCategory;
-use craft\db\ActiveRecord;
-use craft\records\Element;
-use DateTime;
-use yii\db\ActiveQueryInterface;
+namespace CraftCms\DigitalProducts\Models;
+
+use CraftCms\Cms\Shared\BaseModel;
+use CraftCms\Cms\Shared\Concerns\HasUid;
+use CraftCms\DigitalProducts\Database\Table;
 
 /**
- * Product record.
+ * Row in `digitalproducts_products`. `id` is the product element's ID.
  *
- * @property int $id            Product id
- * @property int $typeId        Product type id
- * @property int $taxCategoryId Product tax category id
- * @property DateTime $postDate      Product post date
- * @property DateTime $expiryDate    Product expiry date
- * @property bool $promotable    Can sales/discounts be applied?
- * @property Element $element       Element
- * @property ProductType $type          Product type
- * @property TaxCategory $taxCategory   Tax category
+ * The SKU and price live in Commerce's purchasable tables.
  *
- * @author    Pixel & Tonic, Inc. <support@pixelandtonic.com>
- * @copyright Copyright (c) 2016, Pixel & Tonic, Inc.
+ * @property int $id
+ * @property int $typeId
+ * @property int $taxCategoryId
+ * @property string|null $postDate
+ * @property string|null $expiryDate
+ * @property bool $promotable
+ * @property string $dateCreated
+ * @property string $dateUpdated
  */
-class Product extends ActiveRecord
+class Product extends BaseModel
 {
-    /**
-     * @inheritdoc
-     */
-    public static function tableName(): string
-    {
-        return '{{%digitalproducts_products}}';
-    }
+    use HasUid;
 
-    /**
-     * Return the product's type.
-     *
-     * @return ActiveQueryInterface The relational query object.
-     */
-    public function getType(): ActiveQueryInterface
-    {
-        return $this->hasOne(ProductType::class, ['id' => 'typeId']);
-    }
+    #[\Override]
+    protected $table = Table::PRODUCTS;
 
-    /**
-     * Return the product's tax category.
-     *
-     * @return ActiveQueryInterface The relational query object.
-     */
-    public function getTaxCategory(): ActiveQueryInterface
-    {
-        return $this->hasOne(TaxCategory::class, ['id' => 'taxCategoryId']);
-    }
+    public $timestamps = false;
 
-    /**
-     * Returns the entry’s element.
-     *
-     * @return ActiveQueryInterface The relational query object.
-     */
-    public function getElement(): ActiveQueryInterface
-    {
-        return $this->hasOne(Element::class, ['id' => 'id']);
-    }
+    /** `id` is a foreign key to `elements.id`, not an auto-increment column. */
+    public $incrementing = false;
+
+    #[\Override]
+    protected $casts = [
+        'typeId' => 'integer',
+        'taxCategoryId' => 'integer',
+        'promotable' => 'boolean',
+    ];
 }

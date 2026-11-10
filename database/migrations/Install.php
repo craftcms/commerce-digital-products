@@ -1,167 +1,125 @@
 <?php
 
-namespace craft\digitalproducts\migrations;
+declare(strict_types=1);
 
-use craft\db\Migration;
-use craft\digitalproducts\db\Table;
-use craft\helpers\Db;
+namespace CraftCms\DigitalProducts\Database\Migrations;
+
+use CraftCms\Cms\Database\Migration;
+use CraftCms\Cms\Database\Table as CraftTable;
+use CraftCms\Cms\ProjectConfig\ProjectConfig;
+use CraftCms\Commerce\Database\Table as CommerceTable;
+use CraftCms\DigitalProducts\Database\Table;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
 
 /**
- * Installation Migration
+ * Creates the Digital Products tables on a fresh install, and drops them on uninstall.
  *
- * @author Pixel & Tonic, Inc. <support@pixelandtonic.com>
- * @since  2.0
+ * The schema matches Digital Products 5.x: SKUs and prices live in Commerce's purchasable tables, and a
+ * license's product and owner email are optional.
  */
 class Install extends Migration
 {
-    /**
-     * @inheritdoc
-     */
-    public function safeUp(): bool
+    public function up(): void
     {
-        $this->createTables();
-        $this->createIndexes();
-        $this->addForeignKeys();
+        Schema::create(Table::PRODUCT_TYPES, function (Blueprint $table) {
+            $table->integer('id', true);
+            $table->integer('fieldLayoutId')->nullable();
+            $table->string('name');
+            $table->string('handle');
+            $table->string('skuFormat')->nullable();
+            $table->dateTime('dateCreated');
+            $table->dateTime('dateUpdated');
+            $table->char('uid', 36)->default('0');
 
-        return true;
+            $table->unique('handle');
+            $table->index('fieldLayoutId');
+        });
+
+        Schema::create(Table::PRODUCT_TYPES_SITES, function (Blueprint $table) {
+            $table->integer('id', true);
+            $table->integer('productTypeId');
+            $table->integer('siteId');
+            $table->text('uriFormat')->nullable();
+            $table->string('template', 500)->nullable();
+            $table->boolean('hasUrls')->nullable();
+            $table->dateTime('dateCreated');
+            $table->dateTime('dateUpdated');
+            $table->char('uid', 36)->default('0');
+
+            $table->unique(['productTypeId', 'siteId']);
+            $table->index('siteId');
+        });
+
+        Schema::create(Table::PRODUCTS, function (Blueprint $table) {
+            $table->integer('id')->primary();
+            $table->integer('typeId');
+            $table->integer('taxCategoryId');
+            $table->dateTime('postDate')->nullable();
+            $table->dateTime('expiryDate')->nullable();
+            $table->boolean('promotable');
+            $table->dateTime('dateCreated');
+            $table->dateTime('dateUpdated');
+            $table->char('uid', 36)->default('0');
+
+            $table->index('typeId');
+            $table->index('taxCategoryId');
+        });
+
+        Schema::create(Table::LICENSES, function (Blueprint $table) {
+            $table->integer('id')->primary();
+            $table->integer('productId')->nullable();
+            $table->integer('orderId')->nullable();
+            $table->string('licenseKey');
+            $table->string('ownerName')->nullable();
+            $table->string('ownerEmail')->nullable();
+            $table->integer('userId')->nullable();
+            $table->dateTime('dateCreated');
+            $table->dateTime('dateUpdated');
+            $table->char('uid', 36)->default('0');
+
+            $table->unique('licenseKey');
+            $table->index('orderId');
+            $table->index('productId');
+        });
+
+        Schema::table(Table::PRODUCT_TYPES, fn (Blueprint $table) => $table->foreign('fieldLayoutId')->references('id')->on(CraftTable::FIELDLAYOUTS)->nullOnDelete());
+        Schema::table(Table::PRODUCT_TYPES_SITES, fn (Blueprint $table) => $table->foreign('siteId')->references('id')->on(CraftTable::SITES)->cascadeOnDelete()->cascadeOnUpdate());
+        Schema::table(Table::PRODUCT_TYPES_SITES, fn (Blueprint $table) => $table->foreign('productTypeId')->references('id')->on(Table::PRODUCT_TYPES)->cascadeOnDelete());
+        Schema::table(Table::PRODUCTS, fn (Blueprint $table) => $table->foreign('id')->references('id')->on(CraftTable::ELEMENTS)->cascadeOnDelete());
+        Schema::table(Table::PRODUCTS, fn (Blueprint $table) => $table->foreign('taxCategoryId')->references('id')->on(CommerceTable::TAXCATEGORIES)->restrictOnDelete());
+        Schema::table(Table::PRODUCTS, fn (Blueprint $table) => $table->foreign('typeId')->references('id')->on(Table::PRODUCT_TYPES)->cascadeOnDelete());
+        Schema::table(Table::LICENSES, fn (Blueprint $table) => $table->foreign('id')->references('id')->on(CraftTable::ELEMENTS)->cascadeOnDelete());
+        Schema::table(Table::LICENSES, fn (Blueprint $table) => $table->foreign('orderId')->references('id')->on(CommerceTable::ORDERS)->nullOnDelete());
+        Schema::table(Table::LICENSES, fn (Blueprint $table) => $table->foreign('productId')->references('id')->on(Table::PRODUCTS)->restrictOnDelete());
+        Schema::table(Table::LICENSES, fn (Blueprint $table) => $table->foreign('userId')->references('id')->on(CraftTable::USERS)->nullOnDelete());
     }
 
     /**
-     * @inheritdoc
+     * Drops the tables and removes the `digital-products` project config.
+     *
+     * Never deletes elements: Commerce's migration command moves the data out and retypes the elements first,
+     * so this also has to work when the tables are already empty.
      */
-    public function safeDown(): bool
+    public function down(): void
     {
-        $this->dropForeignKeys();
-        $this->dropTables();
+        Schema::disableForeignKeyConstraints();
 
-        return true;
-    }
+        foreach ([Table::LICENSES, Table::PRODUCTS, Table::PRODUCT_TYPES_SITES, Table::PRODUCT_TYPES] as $table) {
+            Schema::dropIfExists($table);
+        }
 
-    /**
-     * Creates the tables for Digital Products
-     */
-    protected function createTables(): void
-    {
-        $this->archiveTableIfExists(Table::LICENSES);
-        $this->createTable(Table::LICENSES, [
-            'id' => $this->primaryKey(),
-            'productId' => $this->integer()->null(),
-            'orderId' => $this->integer()->null(),
-            'licenseKey' => $this->string()->notNull(),
-            'ownerName' => $this->string(),
-            'ownerEmail' => $this->string()->null(),
-            'userId' => $this->integer()->null(),
-            'dateCreated' => $this->dateTime()->notNull(),
-            'dateUpdated' => $this->dateTime()->notNull(),
-            'uid' => $this->uid(),
-        ]);
+        Schema::enableForeignKeyConstraints();
 
-        $this->archiveTableIfExists(Table::PRODUCTS);
-        $this->createTable(Table::PRODUCTS, [
-            'id' => $this->primaryKey(),
-            'typeId' => $this->integer()->notNull(),
-            'taxCategoryId' => $this->integer()->notNull(),
-            'postDate' => $this->dateTime(),
-            'expiryDate' => $this->dateTime(),
-            'promotable' => $this->boolean()->notNull(),
-            'sku' => $this->string()->notNull(),
-            'price' => $this->decimal(14, 4)->notNull()->unsigned(),
-            'dateCreated' => $this->dateTime()->notNull(),
-            'dateUpdated' => $this->dateTime()->notNull(),
-            'uid' => $this->uid(),
-        ]);
+        // Mute the project config handlers, which would otherwise delete the products of each removed product type.
+        $projectConfig = app(ProjectConfig::class);
+        $muteEvents = $projectConfig->muteEvents;
+        $projectConfig->muteEvents = true;
 
-        $this->archiveTableIfExists(Table::PRODUCT_TYPES);
-        $this->createTable(Table::PRODUCT_TYPES, [
-            'id' => $this->primaryKey(),
-            'fieldLayoutId' => $this->integer(),
-            'name' => $this->string()->notNull(),
-            'handle' => $this->string()->notNull(),
-            'skuFormat' => $this->string(),
-            'dateCreated' => $this->dateTime()->notNull(),
-            'dateUpdated' => $this->dateTime()->notNull(),
-            'uid' => $this->uid(),
-        ]);
-
-        $this->archiveTableIfExists(Table::PRODUCT_TYPES_SITES);
-        $this->createTable(Table::PRODUCT_TYPES_SITES, [
-            'id' => $this->primaryKey(),
-            'productTypeId' => $this->integer()->notNull(),
-            'siteId' => $this->integer()->notNull(),
-            'uriFormat' => $this->text(),
-            'template' => $this->string(500),
-            'hasUrls' => $this->boolean(),
-            'dateCreated' => $this->dateTime()->notNull(),
-            'dateUpdated' => $this->dateTime()->notNull(),
-            'uid' => $this->uid(),
-        ]);
-    }
-
-    /**
-     * Drop the tables
-     */
-    protected function dropTables(): void
-    {
-        $this->dropTable(Table::LICENSES);
-        $this->dropTable(Table::PRODUCTS);
-        $this->dropTable(Table::PRODUCT_TYPES);
-        $this->dropTable(Table::PRODUCT_TYPES_SITES);
-    }
-
-    /**
-     * Creates the indexes.
-     */
-    protected function createIndexes(): void
-    {
-        $this->createIndex(null, Table::LICENSES, 'licenseKey', true);
-        $this->createIndex(null, Table::LICENSES, 'orderId', false);
-        $this->createIndex(null, Table::LICENSES, 'productId', false);
-
-        $this->createIndex(null, Table::PRODUCTS, 'sku', true);
-        $this->createIndex(null, Table::PRODUCTS, 'typeId', false);
-        $this->createIndex(null, Table::PRODUCTS, 'taxCategoryId', false);
-
-        $this->createIndex(null, Table::PRODUCT_TYPES, 'handle', true);
-        $this->createIndex(null, Table::PRODUCT_TYPES, 'fieldLayoutId', false);
-
-        $this->createIndex(null, Table::PRODUCT_TYPES_SITES, ['productTypeId', 'siteId'], true);
-        $this->createIndex(null, Table::PRODUCT_TYPES_SITES, 'siteId', false);
-    }
-
-    /**
-     * Adds the foreign keys.
-     */
-    protected function addForeignKeys(): void
-    {
-        $this->addForeignKey(null, Table::LICENSES, 'id', '{{%elements}}', 'id', 'CASCADE', null);
-        $this->addForeignKey(null, Table::LICENSES, 'orderId', '{{%commerce_orders}}', 'id', 'SET NULL', null);
-        $this->addForeignKey(null, Table::LICENSES, 'productId', Table::PRODUCTS, 'id', 'RESTRICT', null);
-        $this->addForeignKey(null, Table::LICENSES, 'userId', '{{%users}}', 'id', 'SET NULL', null);
-
-        $this->addForeignKey(null, Table::PRODUCTS, 'id', '{{%elements}}', 'id', 'CASCADE', null);
-        $this->addForeignKey(null, Table::PRODUCTS, 'taxCategoryId', '{{%commerce_taxcategories}}', 'id', 'RESTRICT', null);
-        $this->addForeignKey(null, Table::PRODUCTS, 'typeId', Table::PRODUCT_TYPES, 'id', 'CASCADE', null);
-
-        $this->addForeignKey(null, Table::PRODUCT_TYPES, 'fieldLayoutId', '{{%fieldlayouts}}', 'id', 'SET NULL', null);
-
-        $this->addForeignKey(null, Table::PRODUCT_TYPES_SITES, 'siteId', '{{%sites}}', 'id', 'CASCADE', 'CASCADE');
-        $this->addForeignKey(null, Table::PRODUCT_TYPES_SITES, 'productTypeId', Table::PRODUCT_TYPES, 'id', 'CASCADE', null);
-    }
-
-    /**
-     * Adds the foreign keys.
-     */
-    protected function dropForeignKeys(): void
-    {
-        Db::dropForeignKeyIfExists(Table::LICENSES, ['id']);
-        Db::dropForeignKeyIfExists(Table::LICENSES, ['orderId']);
-        Db::dropForeignKeyIfExists(Table::LICENSES, ['productId']);
-        Db::dropForeignKeyIfExists(Table::LICENSES, ['userId']);
-        Db::dropForeignKeyIfExists(Table::PRODUCTS, ['id']);
-        Db::dropForeignKeyIfExists(Table::PRODUCTS, ['taxCategoryId']);
-        Db::dropForeignKeyIfExists(Table::PRODUCTS, ['typeId']);
-        Db::dropForeignKeyIfExists(Table::PRODUCT_TYPES, ['fieldLayoutId']);
-        Db::dropForeignKeyIfExists(Table::PRODUCT_TYPES_SITES, ['siteId']);
-        Db::dropForeignKeyIfExists(Table::PRODUCT_TYPES_SITES, ['productTypeId']);
+        try {
+            $projectConfig->remove('digital-products');
+        } finally {
+            $projectConfig->muteEvents = $muteEvents;
+        }
     }
 }

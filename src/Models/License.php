@@ -1,78 +1,42 @@
 <?php
 
-namespace craft\digitalproducts\records;
+declare(strict_types=1);
 
-use craft\commerce\records\Order;
-use craft\db\ActiveRecord;
-use craft\records\Element;
-use craft\records\User;
-use yii\db\ActiveQueryInterface;
+namespace CraftCms\DigitalProducts\Models;
+
+use CraftCms\Cms\Shared\BaseModel;
+use CraftCms\Cms\Shared\Concerns\HasUid;
+use CraftCms\DigitalProducts\Database\Table;
 
 /**
- * License record.
+ * Row in `digitalproducts_licenses`. `id` is the license element's ID.
  *
- * @property int $id         License id
- * @property int $productId  Product id
- * @property int $orderId    Order id
- * @property string $licenseKey License key
- * @property string $ownerName  Name of the license owner
- * @property string $ownerEmail Email of the license owner
- * @property int $userId     User id
- * @property Element $element    Element
- * @property Product $product    Product
- * @property Order $order      Order
- * @property User $user       User
- *
- * @author    Pixel & Tonic, Inc. <support@pixelandtonic.com>
- * @copyright Copyright (c) 2016, Pixel & Tonic, Inc.
+ * @property int $id
+ * @property int|null $productId
+ * @property int|null $orderId
+ * @property string $licenseKey
+ * @property string|null $ownerName
+ * @property string|null $ownerEmail
+ * @property int|null $userId
+ * @property string $dateCreated
+ * @property string $dateUpdated
  */
-class License extends ActiveRecord
+class License extends BaseModel
 {
-    /**
-     * @inheritdoc
-     */
-    public static function tableName(): string
-    {
-        return '{{%digitalproducts_licenses}}';
-    }
+    use HasUid;
 
-    /**
-     * Return the license's element.
-     *
-     * @return ActiveQueryInterface The relational query object.
-     */
-    public function getElement(): ActiveQueryInterface
-    {
-        return $this->hasOne(Element::class, ['id' => 'id']);
-    }
+    #[\Override]
+    protected $table = Table::LICENSES;
 
-    /**
-     * Return the licensed product.
-     *
-     * @return ActiveQueryInterface The relational query object.
-     */
-    public function getProduct(): ActiveQueryInterface
-    {
-        return $this->hasOne(Product::class, ['id' => 'productId']);
-    }
+    public $timestamps = false;
 
-    /**
-     * Return the order that contained this license.
-     *
-     * @return ActiveQueryInterface The relational query object.
-     */
-    public function getOrder(): ActiveQueryInterface
-    {
-        return $this->hasOne(Order::class, ['id' => 'orderId']);
-    }
+    /** `id` is a foreign key to `elements.id`, not an auto-increment column. */
+    public $incrementing = false;
 
-    /**
-     * Return the user owning this license.
-     *
-     * @return ActiveQueryInterface The relational query object.
-     */
-    public function getUser(): ActiveQueryInterface
-    {
-        return $this->hasOne(User::class, ['id' => 'userId']);
-    }
+    #[\Override]
+    protected $casts = [
+        'productId' => 'integer',
+        'orderId' => 'integer',
+        'userId' => 'integer',
+    ];
 }

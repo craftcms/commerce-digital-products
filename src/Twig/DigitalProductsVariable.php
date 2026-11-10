@@ -1,60 +1,46 @@
 <?php
 
-namespace craft\digitalproducts\variables;
+declare(strict_types=1);
 
-use craft\digitalproducts\elements\db\LicenseQuery;
-use craft\digitalproducts\elements\db\ProductQuery;
-use craft\digitalproducts\elements\License;
-use craft\digitalproducts\elements\Product;
-use craft\digitalproducts\models\ProductType;
-use craft\digitalproducts\Plugin as DigitalProductsPlugin;
+namespace CraftCms\DigitalProducts\Twig;
+
+use CraftCms\DigitalProducts\Data\ProductType;
+use CraftCms\DigitalProducts\Elements\Queries\LicenseQuery;
+use CraftCms\DigitalProducts\Elements\Queries\ProductQuery;
+use CraftCms\DigitalProducts\Plugin;
+use CraftCms\DigitalProducts\ProductTypes;
 
 /**
- * Variable class.
- *
- * @author    Pixel & Tonic, Inc. <support@pixelandtonic.com>
- * @copyright Copyright (c) 2016, Pixel & Tonic, Inc.
- * @license   https://craftcommerce.com/license Craft Commerce License Agreement
+ * The `craft.digitalProducts` Twig variable.
  */
-class DigitalProducts
+class DigitalProductsVariable
 {
     /**
-     * Return the product types service.
-     *
      * @return ProductType[]
      */
     public function getProductTypes(): array
     {
-        return DigitalProductsPlugin::getInstance()->getProductTypes()->getAllProductTypes();
+        return app(ProductTypes::class)->getAllProductTypes();
     }
 
     /**
-     * Get licenses service.
-     *
-     * @return LicenseQuery
+     * @param  array<string, mixed>  $criteria
      */
-    public function licenses(): LicenseQuery
+    public function licenses(array $criteria = []): LicenseQuery
     {
-        return License::find();
+        return new LicenseQuery($criteria);
     }
 
     /**
-     * Get Digital Products.
-     *
-     * @return ProductQuery
+     * @param  array<string, mixed>  $criteria
      */
-    public function products(): ProductQuery
+    public function products(array $criteria = []): ProductQuery
     {
-        return Product::find();
+        return new ProductQuery($criteria);
     }
 
-    /**
-     * Get the plugin instance.
-     *
-     * @return DigitalProductsPlugin
-     */
-    public function getPlugin(): DigitalProductsPlugin
+    public function getPlugin(): Plugin
     {
-        return DigitalProductsPlugin::getInstance();
+        return app(Plugin::class);
     }
 }

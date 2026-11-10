@@ -1,723 +1,260 @@
 <?php
 
-namespace craft\digitalproducts\elements;
+declare(strict_types=1);
 
-use Craft;
-use craft\commerce\base\Purchasable;
-use craft\commerce\behaviors\CurrencyAttributeBehavior;
-use craft\commerce\models\TaxCategory;
-use craft\commerce\Plugin as Commerce;
-use craft\db\Query;
-use craft\digitalproducts\elements\db\ProductQuery;
-use craft\digitalproducts\models\ProductType;
-use craft\digitalproducts\Plugin as DigitalProducts;
-use craft\digitalproducts\records\Product as ProductRecord;
-use craft\elements\actions\Delete;
-use craft\elements\actions\SetStatus;
-use craft\elements\db\EagerLoadPlan;
-use craft\elements\User;
-use craft\helpers\ArrayHelper;
-use craft\helpers\Cp;
-use craft\helpers\DateTimeHelper;
-use craft\helpers\Html;
-use craft\models\FieldLayout;
-use craft\validators\DateTimeValidator;
+namespace CraftCms\DigitalProducts\Elements;
+
+use CraftCms\Cms\Cms;
+use CraftCms\Cms\Cp\Data\ActionItem;
+use CraftCms\Cms\Cp\FormFields;
+use CraftCms\Cms\Element\Actions\Delete;
+use CraftCms\Cms\Element\Data\EagerLoadPlan;
+use CraftCms\Cms\Element\ElementCollection;
+use CraftCms\Cms\Element\ElementHelper;
+use CraftCms\Cms\FieldLayout\FieldLayout;
+use CraftCms\Cms\Support\Facades\ElementActions;
+use CraftCms\Cms\Support\Facades\I18N;
+use CraftCms\Cms\Support\Html;
+use CraftCms\Cms\Support\Query;
+use CraftCms\Cms\Support\Sequence;
+use CraftCms\Cms\Support\Url;
+use CraftCms\Cms\Ui\Controls\DateTime as DateTimeControl;
+use CraftCms\Cms\Ui\Controls\Slug;
+use CraftCms\Cms\Ui\Enums\ControlMode;
+use CraftCms\Cms\Ui\Nodes\Field;
+use CraftCms\Commerce\Database\Table as CommerceTable;
+use CraftCms\Commerce\Helpers\Purchasable as PurchasableHelper;
+use CraftCms\Commerce\Purchasable\Elements\Purchasable;
+use CraftCms\DigitalProducts\Data\ProductType;
+use CraftCms\DigitalProducts\Database\Table;
+use CraftCms\DigitalProducts\DeletionBlockers\LicensesDeletionBlocker;
+use CraftCms\DigitalProducts\Elements\Queries\ProductQuery;
+use CraftCms\DigitalProducts\Models\Product as ProductRecord;
+use CraftCms\DigitalProducts\ProductTypes;
+use CraftCms\DigitalProducts\Validation\ProductRules;
+use CraftCms\RulesetValidation\Attributes\Ruleset;
 use DateTime;
-use yii\base\Exception;
+use DateTimeInterface;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Override;
+use RuntimeException;
+use Throwable;
+
+use function CraftCms\Cms\currentUser;
+use function CraftCms\Cms\renderSandboxedObjectTemplate;
+use function CraftCms\Cms\t;
 
 /**
- * Class Commerce_ProductElementType
+ * A digital product: a Commerce purchasable that issues licenses when it is bought.
  *
- * @author    Pixel & Tonic, Inc. <support@pixelandtonic.com>
- * @copyright Copyright (c) 2015, Pixel & Tonic, Inc.
- * @license   https://craftcommerce.com/license Craft Commerce License Agreement
- * @see       https://craftcommerce.com
- * @package   craft.plugins.commerce.elementtypes
- * @since     1.0
+ * The element ID is the row ID in `digitalproducts_products`, `commerce_purchasables` and
+ * `commerce_purchasables_stores.purchasableId`. The SKU and price are stored by Commerce.
+ *
+ * @property-read ProductType $type
+ * @property-read License[] $existingLicenses
  */
+#[Ruleset(ProductRules::class)]
 class Product extends Purchasable
 {
-    public const STATUS_LIVE = 'live';
-    public const STATUS_PENDING = 'pending';
-    public const STATUS_EXPIRED = 'expired';
+    public const string STATUS_LIVE = 'live';
 
-    /**
-     * @var int|null ID
-     */
-    public ?int $id = null;
+    public const string STATUS_PENDING = 'pending';
 
-    /**
-     * @var int|null Product type id
-     */
+    public const string STATUS_EXPIRED = 'expired';
+
     public ?int $typeId = null;
 
-    /**
-     * @var int|null Tax category id
-     */
-    public ?int $taxCategoryId = null;
-
-    /**
-     * @var DateTime|null Post date
-     */
     public ?DateTime $postDate = null;
 
-    /**
-     * @var DateTime|null Expiry date
-     */
     public ?DateTime $expiryDate = null;
 
-    /**
-     * @var bool Promotable
-     */
-    public bool $promotable = false;
+    /** @var License[]|null */
+    private ?array $existingLicenses = null;
 
-    /**
-     * @var ProductType|null
-     */
-    private ?ProductType $_productType = null;
-
-    /**
-     * @var License[]
-     */
-    private ?array $_existingLicenses = null;
-
-    /**
-     * @inheritdoc
-     */
+    #[Override]
     public static function displayName(): string
     {
-        return Craft::t('digital-products', 'Digital Product');
+        return t('Digital Product', category: 'digital-products');
     }
 
-    /**
-     * @return string
-     */
-    public function __toString(): string
+    #[Override]
+    public static function lowerDisplayName(): string
     {
-        return (string)$this->title;
+        return t('digital product', category: 'digital-products');
     }
 
-    /**
-     * @inheritdoc
-     */
-    public function behaviors(): array
+    #[Override]
+    public static function pluralDisplayName(): string
     {
-        $behaviors = parent::behaviors();
-        $behaviors['currencyAttributes'] = [
-            'class' => CurrencyAttributeBehavior::class,
-            'currencyAttributes' => $this->currencyAttributes(),
-        ];
-        return $behaviors;
+        return t('Digital Products', category: 'digital-products');
     }
 
-    /**
-     * @return null|string
-     */
-    public function getName(): ?string
+    #[Override]
+    public static function pluralLowerDisplayName(): string
     {
-        return $this->title;
+        return t('digital products', category: 'digital-products');
     }
 
-    /**
-     * @inheritdoc
-     */
-    public static function hasContent(): bool
-    {
-        return true;
-    }
-
-    /**
-     * @inheritdoc
-     */
+    #[Override]
     public static function hasTitles(): bool
     {
         return true;
     }
 
-    /**
-     * @inheritdoc
-     */
+    #[Override]
     public static function hasStatuses(): bool
     {
         return true;
     }
 
-    /**
-     * @inheritdoc
-     */
+    #[Override]
+    public static function hasUris(): bool
+    {
+        return true;
+    }
+
+    #[Override]
     public static function isLocalized(): bool
     {
         return true;
     }
 
-    /**
-     * @inheritdoc
-     */
-    public static function defineSources(string $context = null): array
+    #[Override]
+    public static function hasDrafts(): bool
     {
-        if ($context === 'index') {
-            $productTypes = DigitalProducts::getInstance()->getProductTypes()->getEditableProductTypes();
-            $editable = true;
-        } else {
-            $productTypes = DigitalProducts::getInstance()->getProductTypes()->getAllProductTypes();
-            $editable = false;
-        }
+        return true;
+    }
 
-        $productTypeIds = [];
+    #[Override]
+    public static function hasInventory(): bool
+    {
+        return false;
+    }
 
-        foreach ($productTypes as $productType) {
-            $productTypeIds[] = $productType->id;
-        }
+    #[Override]
+    public static function statuses(): array
+    {
+        return [
+            self::STATUS_LIVE => t('Live', category: 'digital-products'),
+            self::STATUS_PENDING => t('Pending', category: 'digital-products'),
+            self::STATUS_EXPIRED => t('Expired', category: 'digital-products'),
+            self::STATUS_DISABLED => t('Disabled', category: 'digital-products'),
+        ];
+    }
 
+    #[Override]
+    public static function find(): ProductQuery
+    {
+        return new ProductQuery;
+    }
+
+    #[Override]
+    protected static function defineSources(string $context): array
+    {
+        $productTypesService = app(ProductTypes::class);
+        $editable = $context === 'index';
+        $productTypes = $editable
+            ? $productTypesService->getEditableProductTypes()
+            : $productTypesService->getAllProductTypes();
 
         $sources = [
             [
                 'key' => '*',
-                'label' => Craft::t('digital-products', 'All products'),
+                'label' => t('All products', category: 'digital-products'),
                 'criteria' => [
-                    'typeId' => $productTypeIds,
+                    'typeId' => array_map(fn (ProductType $productType) => $productType->id, $productTypes),
                     'editable' => $editable,
                 ],
                 'defaultSort' => ['postDate', 'desc'],
             ],
         ];
 
-        $sources[] = ['heading' => Craft::t('digital-products', 'Product Types')];
+        if ($productTypes !== []) {
+            $sources[] = ['heading' => t('Product Types', category: 'digital-products')];
+        }
+
+        $user = currentUser();
 
         foreach ($productTypes as $productType) {
-            $key = 'productType:' . $productType->uid;
-            $canEditProducts = Craft::$app->getUser()->checkPermission('digitalProducts-manageProductType:' . $productType->uid);
+            $key = 'productType:'.$productType->uid;
 
             $sources[$key] = [
                 'key' => $key,
-                'label' => $productType->name,
+                'label' => t($productType->name, category: 'site'),
                 'data' => [
                     'handle' => $productType->handle,
-                    'editable' => $canEditProducts,
+                    'editable' => (bool) $user?->can('digitalProducts-manageProductType:'.$productType->uid),
                 ],
-                'criteria' => ['typeId' => $productType->id, 'editable' => $editable],
+                'criteria' => [
+                    'typeId' => $productType->id,
+                    'editable' => $editable,
+                ],
+                'sites' => $productType->getSiteIds(),
+                'defaultSort' => ['postDate', 'desc'],
             ];
         }
 
         return $sources;
     }
 
-    /**
-     * @inheritdoc
-     */
-    public function getStatuses(): array
+    #[Override]
+    protected static function defineFieldLayouts(?string $source): array
+    {
+        $productTypesService = app(ProductTypes::class);
+
+        if ($source === null || $source === '*') {
+            $productTypes = $productTypesService->getAllProductTypes();
+        } elseif (preg_match('/^productType:(.+)$/', $source, $matches)) {
+            $productTypes = array_filter([$productTypesService->getProductTypeByUid($matches[1])]);
+        } else {
+            $productTypes = [];
+        }
+
+        return array_map(fn (ProductType $productType) => $productType->getFieldLayout(), array_values($productTypes));
+    }
+
+    #[Override]
+    protected static function defineActions(string $source): array
     {
         return [
-            self::STATUS_LIVE => Craft::t('digital-products', 'Live'),
-            self::STATUS_PENDING => Craft::t('digital-products', 'Pending'),
-            self::STATUS_EXPIRED => Craft::t('digital-products', 'Expired'),
-            self::STATUS_DISABLED => Craft::t('digital-products', 'Disabled'),
+            ElementActions::createAction([
+                'type' => Delete::class,
+                'confirmationMessage' => t('Are you sure you want to delete the selected products?', category: 'digital-products'),
+                'successMessage' => t('Products deleted.', category: 'digital-products'),
+            ], static::class),
         ];
     }
 
-
-    /**
-     * @param string $handle
-     * @param array|License[] $elements
-     * @param EagerLoadPlan $plan
-     */
-    public function setEagerLoadedElements(string $handle, array $elements, EagerLoadPlan $plan): void
-    {
-        if ($handle === 'existingLicenses') {
-            $this->_existingLicenses = $elements;
-
-            return;
-        }
-
-        parent::setEagerLoadedElements($handle, $elements, $plan);
-    }
-
-    /**
-     * @inheritdoc
-     */
-    public static function eagerLoadingMap(array $sourceElements, string $handle): array|null|false
-    {
-        if ($handle === 'existingLicenses') {
-            $userId = Craft::$app->getUser()->getId();
-
-            if ($userId) {
-                $sourceElementIds = ArrayHelper::getColumn($sourceElements, 'id');
-
-                $map = (new Query())
-                    ->select('productId as source, id as target')
-                    ->from('{{%digitalproducts_licenses}}')
-                    ->where(['in', 'productId', $sourceElementIds])
-                    ->andWhere(['userId' => $userId])
-                    ->all();
-
-                return [
-                    'elementType' => License::class,
-                    'map' => $map,
-                ];
-            }
-        }
-
-        return parent::eagerLoadingMap($sourceElements, $handle);
-    }
-
-    /**
-     * @inheritdoc
-     */
-    public function getIsAvailable(): bool
-    {
-        return $this->getStatus() === static::STATUS_LIVE;
-    }
-
-    /**
-     * @inheritdoc
-     */
-    public function getStatus(): ?string
-    {
-        $status = parent::getStatus();
-
-        if ($status === static::STATUS_ENABLED && $this->postDate) {
-            $currentTime = DateTimeHelper::currentTimeStamp();
-            $postDate = $this->postDate->getTimestamp();
-            $expiryDate = $this->expiryDate ? $this->expiryDate->getTimestamp() : null;
-
-            if ($postDate <= $currentTime && (!$expiryDate || $expiryDate > $currentTime)) {
-                return static::STATUS_LIVE;
-            }
-
-            if ($postDate > $currentTime) {
-                return static::STATUS_PENDING;
-            }
-
-            return static::STATUS_EXPIRED;
-        }
-
-        return $status;
-    }
-
-    /**
-     * @inheritdoc
-     */
-    public function defineRules(): array
-    {
-        $rules = parent::defineRules();
-
-        $rules[] = [['typeId'], 'required'];
-        $rules[] = [['sku'], 'string', 'max' => 255];
-        $rules[] = [['postDate', 'expiryDate'], DateTimeValidator::class];
-
-        return $rules;
-    }
-
-
-    /**
-     * @inheritdoc
-     *
-     * @return ProductQuery The newly created [[ProductQuery]] instance.
-     */
-    public static function find(): ProductQuery
-    {
-        return new ProductQuery(static::class);
-    }
-
-    /**
-     * @inheritdoc
-     */
-    public function datetimeAttributes(): array
-    {
-        $attributes = parent::datetimeAttributes();
-        $attributes[] = 'postDate';
-        $attributes[] = 'expiryDate';
-
-        return $attributes;
-    }
-
-    /**
-     * @inheritdoc
-     */
-    public function getIsEditable(): bool
-    {
-        if ($this->getType()) {
-            $uid = $this->getType()->uid;
-
-            return Craft::$app->getUser()->checkPermission('digitalProducts-manageProductType:' . $uid);
-        }
-
-        return false;
-    }
-
-    /**
-     * @inheritdoc
-     */
-    public static function hasDrafts(): bool
+    #[Override]
+    protected static function includeSetStatusAction(): bool
     {
         return true;
     }
 
-    /**
-     * @inheritdoc
-     */
-    protected function cpEditUrl(): ?string
+    #[Override]
+    public static function deletionBlockers(ElementCollection $elements, bool $hardDelete): array
     {
-        $productType = $this->getType();
-
-        if (!$productType) {
-            return null;
-        }
-
-        return sprintf('digital-products/products/%s/%s', $productType->handle, $this->getCanonicalId());
-    }
-
-    /**
-     * @inheritdoc
-     */
-    protected function crumbs(): array
-    {
-        $productType = $this->getType();
-
-        $productTypes = DigitalProducts::getInstance()->getProductTypes()->getEditableProductTypes();
-        $productTypeItems = array_map(fn(ProductType $t) => [
-            'label' => Craft::t('site', $t->name),
-            'url' => 'digital-products/products/' . $t->handle,
-            'selected' => $productType && $t->id === $productType->id,
-        ], $productTypes);
-
         return [
-            [
-                'label' => Craft::t('digital-products', 'Products'),
-                'url' => 'digital-products/products',
-            ],
-            [
-                'menu' => [
-                    'label' => Craft::t('digital-products', 'Select product type'),
-                    'items' => $productTypeItems,
-                ],
-            ],
+            ...parent::deletionBlockers($elements, $hardDelete),
+            new LicensesDeletionBlocker($elements, $hardDelete),
         ];
     }
 
-    /**
-     * @inheritdoc
-     */
-    protected function metaFieldsHtml(bool $static): string
-    {
-        $fields = [];
-
-        $fields[] = $this->slugFieldHtml($static);
-
-        $fields[] = Cp::dateTimeFieldHtml([
-            'status' => $this->getAttributeStatus('postDate'),
-            'label' => Craft::t('digital-products', 'Post Date'),
-            'id' => 'postDate',
-            'name' => 'postDate',
-            'value' => $this->postDate,
-            'errors' => $this->getErrors('postDate'),
-            'disabled' => $static,
-        ]);
-
-        $fields[] = Cp::dateTimeFieldHtml([
-            'status' => $this->getAttributeStatus('expiryDate'),
-            'label' => Craft::t('digital-products', 'Expiry Date'),
-            'id' => 'expiryDate',
-            'name' => 'expiryDate',
-            'value' => $this->expiryDate,
-            'errors' => $this->getErrors('expiryDate'),
-            'disabled' => $static,
-        ]);
-
-        $fields[] = parent::metaFieldsHtml($static);
-
-        $fields[] = Cp::lightswitchFieldHtml([
-            'label' => Craft::t('digital-products', 'Promotable'),
-            'id' => 'promotable',
-            'name' => 'promotable',
-            'on' => $this->promotable,
-            'disabled' => $static,
-        ]);
-
-        return implode("\n", $fields);
-    }
-
-    /**
-     * @inheritdoc
-     */
-    public function setAttributesFromRequest(array $values): void
-    {
-        if (isset($values['taxCategoryId'])) {
-            $this->taxCategoryId = (int)$values['taxCategoryId'] ?: null;
-            unset($values['taxCategoryId']);
-        }
-
-        if (array_key_exists('promotable', $values)) {
-            $this->promotable = (bool)$values['promotable'];
-            unset($values['promotable']);
-        }
-
-        parent::setAttributesFromRequest($values);
-    }
-
-    /**
-     * @inheritdoc
-     */
-    public function getFieldLayout(): ?FieldLayout
-    {
-        $productType = $this->getType();
-
-        return $productType ? $productType->getProductFieldLayout() : null;
-    }
-
-    /**
-     * @inheritdoc
-     */
-    public function getUriFormat(): ?string
-    {
-        $productType = $this->getType();
-
-        if ($productType === null) {
-            return null;
-        }
-
-        $siteId = $this->siteId ?: Craft::$app->getSites()->currentSite->id;
-
-        if (isset($productType->siteSettings[$siteId]) && $productType->siteSettings[$siteId]->hasUrls) {
-            $productTypeSites = $productType->getSiteSettings();
-
-            if (isset($productTypeSites[$this->siteId])) {
-                return $productTypeSites[$this->siteId]->uriFormat;
-            }
-        }
-
-        return null;
-    }
-
-    /**
-     * @inheritdoc
-     */
-    public static function hasUris(): bool
-    {
-        return true;
-    }
-
-    /**
-     * Returns the product's product type model.
-     *
-     * @return ProductType|null
-     */
-    public function getType(): ?ProductType
-    {
-        if ($this->_productType === null && $this->typeId) {
-            $this->_productType = DigitalProducts::getInstance()->getProductTypes()->getProductTypeById($this->typeId);
-        }
-
-        return $this->_productType;
-    }
-
-    /**
-     * Gets the tax category
-     *
-     * @return TaxCategory
-     */
-    public function getTaxCategory(): TaxCategory
-    {
-        if ($this->taxCategoryId) {
-            return Commerce::getInstance()->getTaxCategories()->getTaxCategoryById($this->taxCategoryId);
-        }
-
-        return Commerce::getInstance()->getTaxCategories()->getDefaultTaxCategory();
-    }
-
-    /**
-     * Return all the licenses for this product for the current user.
-     *
-     * @return License[]
-     */
-    public function getExistingLicenses(): array
-    {
-        if ($this->_existingLicenses === null) {
-            $this->_existingLicenses = [];
-            $userId = Craft::$app->getUser()->getId();
-
-            if ($userId) {
-                /** @var License[]|null $existingLicenses */
-                $existingLicenses = License::find()->ownerId($userId)->all();
-                $this->_existingLicenses = $existingLicenses;
-            }
-        }
-
-        return $this->_existingLicenses;
-    }
-
-    /**
-     * @inheritdoc
-     * @since 2.4
-     */
-    public function getGqlTypeName(): string
-    {
-        return static::gqlTypeNameByContext($this->getType());
-    }
-
-    /**
-     * @inheritdoc
-     * @since 2.4
-     */
-    public static function gqlTypeNameByContext($context): string
-    {
-        /** @var ProductType $context */
-        return $context->handle . '_Product';
-    }
-
-    /**
-     * @inheritdoc
-     * @since 2.4
-     */
-    public static function gqlScopesByContext(mixed $context): array
-    {
-        /** @var ProductType $context */
-        return ['digitalProductTypes.' . $context->uid];
-    }
-
-    /**
-     * @inheritdoc
-     */
-    public function afterSave(bool $isNew): void
-    {
-        if (!$this->propagating) {
-            if (!$isNew) {
-                $productRecord = ProductRecord::findOne($this->id);
-
-                if (!$productRecord) {
-                    throw new Exception('Invalid product id: ' . $this->id);
-                }
-            } else {
-                $productRecord = new ProductRecord();
-                $productRecord->id = $this->id;
-            }
-
-            $productRecord->postDate = $this->postDate;
-            $productRecord->expiryDate = $this->expiryDate;
-            $productRecord->typeId = $this->typeId;
-            $productRecord->promotable = (bool)$this->promotable;
-            $productRecord->taxCategoryId = $this->taxCategoryId;
-
-            // Generate SKU if empty
-            if (empty($this->getSku())) {
-                try {
-                    $productType = DigitalProducts::getInstance()->getProductTypes()->getProductTypeById($this->typeId);
-                    $this->setSku(Craft::$app->getView()->renderObjectTemplate($productType->skuFormat, $this));
-                } catch (\Exception $e) {
-                    $this->setSku('');
-                }
-            }
-
-            $productRecord->dateUpdated = $this->dateUpdated;
-            $productRecord->dateCreated = $this->dateCreated;
-
-            $dirtyAttributes = array_keys($productRecord->getDirtyAttributes());
-            $productRecord->save(false);
-
-            $this->setDirtyAttributes($dirtyAttributes);
-        }
-
-        parent::afterSave($isNew);
-    }
-
-    /**
-     * @inheritdoc
-     */
-    public function getPurchasableId(): ?int
-    {
-        return $this->id;
-    }
-
-    /**
-     * @inheritdoc
-     */
-    public function getSnapshot(): array
-    {
-        return $this->getAttributes();
-    }
-
-    /**
-     * @inheritdoc
-     */
-    public function getDescription(): string
-    {
-        return $this->title;
-    }
-
-    /**
-     * @inheritdoc
-     */
-    public function getTaxCategoryId(): int
-    {
-        return $this->taxCategoryId;
-    }
-
-    /**
-     * @inheritdoc
-     */
-    public function hasFreeShipping(): bool
-    {
-        return true;
-    }
-
-    /**
-     * @return bool
-     */
-    public function getIsShippable(): bool
-    {
-        return false;
-    }
-
-    /**
-     * @inheritdoc
-     */
-    public function getIsPromotable(): bool
-    {
-        return $this->promotable;
-    }
-
-    /**
-     * @inheritdoc
-     */
-    protected function route(): array|string|null
-    {
-        // Make sure the product type is set to have URLs for this site
-        $siteId = Craft::$app->getSites()->currentSite->id;
-        $productTypeSiteSettings = $this->getType()->getSiteSettings();
-
-        if (!isset($productTypeSiteSettings[$siteId]) || !$productTypeSiteSettings[$siteId]->hasUrls) {
-            return null;
-        }
-
-        return [
-            'templates/render', [
-                'template' => (string)$productTypeSiteSettings[$siteId]->template,
-                'variables' => [
-                    'product' => $this,
-                ],
-            ],
-        ];
-    }
-
-    /**
-     * @inheritdoc
-     */
+    #[Override]
     protected static function defineTableAttributes(): array
     {
-        return [
-            'title' => ['label' => Craft::t('digital-products', 'Title')],
-            'type' => ['label' => Craft::t('digital-products', 'Type')],
-            'slug' => ['label' => Craft::t('digital-products', 'Slug')],
-            'sku' => ['label' => Craft::t('digital-products', 'SKU')],
-            'price' => ['label' => Craft::t('digital-products', 'Price')],
-            'postDate' => ['label' => Craft::t('digital-products', 'Post Date')],
-            'expiryDate' => ['label' => Craft::t('digital-products', 'Expiry Date')],
-        ];
+        return array_merge(parent::defineTableAttributes(), [
+            'title' => ['label' => t('Title', category: 'digital-products')],
+            'type' => ['label' => t('Type', category: 'digital-products')],
+            'slug' => ['label' => t('Slug', category: 'digital-products')],
+            'postDate' => ['label' => t('Post Date', category: 'digital-products')],
+            'expiryDate' => ['label' => t('Expiry Date', category: 'digital-products')],
+            'promotable' => ['label' => t('Promotable', category: 'digital-products')],
+        ]);
     }
 
-    /**
-     * @inheritdoc
-     */
+    #[Override]
     protected static function defineDefaultTableAttributes(string $source): array
     {
         $attributes = [];
@@ -726,163 +263,514 @@ class Product extends Purchasable
             $attributes[] = 'type';
         }
 
-        $attributes[] = 'postDate';
-        $attributes[] = 'expiryDate';
-
-        return $attributes;
+        return [...$attributes, 'sku', 'price', 'postDate', 'expiryDate'];
     }
 
-    /**
-     * @inheritdoc
-     */
-    protected static function defineSearchableAttributes(): array
-    {
-        return ['title'];
-    }
-
-    /**
-     * @inheritdoc
-     */
-    protected function attributeHtml(string $attribute): string
-    {
-        /* @var $productType ProductType */
-        $productType = $this->getType();
-
-        switch ($attribute) {
-            case 'type':
-                return ($productType ? Craft::t('site', Html::encode($productType->name)) : '');
-
-            case 'taxCategory':
-                $taxCategory = $this->getTaxCategory();
-
-                return Craft::t('site', Html::encode($taxCategory->name));
-
-            case 'price':
-                $code = Commerce::getInstance()->getPaymentCurrencies()->getPrimaryPaymentCurrencyIso();
-
-                return Craft::$app->getLocale()->getFormatter()->asCurrency($this->basePrice, strtoupper($code));
-
-            case 'promotable':
-                return ($this->$attribute ? '<span data-icon="check" title="' . Craft::t('digital-products', 'Yes') . '"></span>' : '');
-
-            default:
-                return parent::attributeHtml($attribute);
-        }
-    }
-
-    /**
-     * @inheritdoc
-     */
+    #[Override]
     protected static function defineSortOptions(): array
     {
         return [
-            'title' => Craft::t('digital-products', 'Title'),
+            'title' => t('Title', category: 'digital-products'),
             [
-                'label' => Craft::t('digital-products', 'Post Date'),
-                'orderBy' => 'postDate',
+                'label' => t('Post Date', category: 'digital-products'),
+                'orderBy' => Table::PRODUCTS.'.postDate',
+                'attribute' => 'postDate',
                 'defaultDir' => 'desc',
             ],
             [
-                'label' => Craft::t('digital-products', 'Expiry Date'),
-                'orderBy' => 'expiryDate',
+                'label' => t('Expiry Date', category: 'digital-products'),
+                'orderBy' => Table::PRODUCTS.'.expiryDate',
+                'attribute' => 'expiryDate',
                 'defaultDir' => 'desc',
             ],
             [
-                'label' => Craft::t('digital-products', 'Price'),
+                'label' => t('Price', category: 'digital-products'),
                 'orderBy' => 'purchasables_stores.basePrice',
+                'attribute' => 'price',
                 'defaultDir' => 'asc',
+            ],
+            'sku' => t('SKU', category: 'digital-products'),
+        ];
+    }
+
+    #[Override]
+    public static function sourceCpUri(array $source, ?string $page = null): ?string
+    {
+        $handle = $source['data']['handle'] ?? null;
+
+        if (! str_starts_with((string) ($source['key'] ?? ''), 'productType:') || ! is_string($handle) || $handle === '') {
+            return null;
+        }
+
+        return "digital-products/products/$handle";
+    }
+
+    #[Override]
+    public static function eagerLoadingMap(array $sourceElements, string $handle): array|null|false
+    {
+        if ($handle === 'existingLicenses') {
+            $userId = currentUser()?->getCraftUserId();
+
+            $map = $userId ? DB::table(Table::LICENSES)
+                ->select(['productId as source', 'id as target'])
+                ->whereIn('productId', array_map(fn (self $element) => $element->id, $sourceElements))
+                ->where('userId', $userId)
+                ->get()
+                ->map(fn (object $row) => (array) $row)
+                ->all() : [];
+
+            return [
+                'elementType' => License::class,
+                'map' => $map,
+            ];
+        }
+
+        return parent::eagerLoadingMap($sourceElements, $handle);
+    }
+
+    public static function gqlTypeNameByContext(mixed $context): string
+    {
+        /** @var ProductType $context */
+        return $context->handle.'_Product';
+    }
+
+    #[Override]
+    public static function gqlScopesByContext(mixed $context): array
+    {
+        /** @var ProductType $context */
+        return ['digitalProductTypes.'.$context->uid];
+    }
+
+    #[Override]
+    public function __toString(): string
+    {
+        return (string) $this->title;
+    }
+
+    #[Override]
+    public function setEagerLoadedElements(string $handle, array $elements, EagerLoadPlan $plan): void
+    {
+        if ($handle === 'existingLicenses') {
+            $this->existingLicenses = array_values(array_filter($elements, fn ($element) => $element instanceof License));
+
+            return;
+        }
+
+        parent::setEagerLoadedElements($handle, $elements, $plan);
+    }
+
+    /**
+     * Returns the product's type.
+     *
+     * @throws RuntimeException if the type is missing or invalid.
+     */
+    public function getType(): ProductType
+    {
+        if ($this->typeId === null) {
+            throw new RuntimeException('Digital product is missing its product type ID');
+        }
+
+        return app(ProductTypes::class)->getProductTypeById($this->typeId)
+            ?? throw new RuntimeException('Invalid product type ID: '.$this->typeId);
+    }
+
+    public function getName(): ?string
+    {
+        return $this->title;
+    }
+
+    #[Override]
+    public function getDescription(): string
+    {
+        return (string) $this->title;
+    }
+
+    /**
+     * Returns the current user's licenses for this product.
+     *
+     * @return License[]
+     */
+    public function getExistingLicenses(): array
+    {
+        if ($this->existingLicenses !== null) {
+            return $this->existingLicenses;
+        }
+
+        $userId = currentUser()?->getCraftUserId();
+
+        return $this->existingLicenses = $userId && $this->id
+            ? License::find()->productId($this->getCanonicalId())->ownerId($userId)->all()
+            : [];
+    }
+
+    #[Override]
+    public function getFieldLayout(): ?FieldLayout
+    {
+        if ($this->typeId === null) {
+            return null;
+        }
+
+        return $this->getType()->getFieldLayout();
+    }
+
+    #[Override]
+    public function getUriFormat(): ?string
+    {
+        if ($this->typeId === null) {
+            return null;
+        }
+
+        $siteSettings = $this->getType()->getSiteSettings()[$this->siteId] ?? null;
+
+        return $siteSettings?->hasUrls ? $siteSettings->uriFormat : null;
+    }
+
+    #[Override]
+    public function getSupportedSites(): array
+    {
+        if ($this->typeId === null) {
+            return parent::getSupportedSites();
+        }
+
+        return $this->getType()->getSiteIds();
+    }
+
+    #[Override]
+    protected function route(): array|string|null
+    {
+        $siteSettings = $this->getType()->getSiteSettings()[$this->siteId] ?? null;
+
+        if (! $siteSettings?->hasUrls) {
+            return null;
+        }
+
+        return [
+            'templates/render', [
+                'template' => (string) $siteSettings->template,
+                'variables' => [
+                    'product' => $this,
+                ],
             ],
         ];
     }
 
-    /**
-     * @inheritdoc
-     * @since 2.4
-     */
-    protected static function defineActions(string $source = null): array
+    #[Override]
+    protected function previewTargets(): array
     {
-        $actions = parent::defineActions($source);
-
-        // Get the section(s) we need to check permissions on
-        if ($source == '*') {
-            $productTypes = DigitalProducts::getInstance()->getProductTypes()->getEditableProductTypes();
-        } elseif (preg_match('/^productType:(\d+)$/', $source, $matches)) {
-            $productType = DigitalProducts::getInstance()->getProductTypes()->getProductTypeById((int)$matches[1]);
-
-            if ($productType) {
-                $productTypes = [$productType];
-            }
-        } elseif (preg_match('/^productType:(.+)$/', $source, $matches)) {
-            $productType = DigitalProducts::getInstance()->getProductTypes()->getProductTypeByUid($matches[1]);
-
-            if ($productType) {
-                $productTypes = [$productType];
-            }
+        if ($this->typeId === null || ! ($this->getType()->getSiteSettings()[$this->siteId] ?? null)?->hasUrls) {
+            return [];
         }
 
-        if (!empty($productTypes)) {
-            $userSession = Craft::$app->getUser();
-            $canManage = false;
+        return [[
+            'label' => t('Primary {type} page', ['type' => self::lowerDisplayName()]),
+            'url' => $this->getUrl(),
+        ]];
+    }
 
-            foreach ($productTypes as $productType) {
-                $canManage = $userSession->checkPermission('digitalProducts-manageProductType:' . $productType->uid);
+    #[Override]
+    protected function cacheTags(): array
+    {
+        return ["digitalProductType:$this->typeId"];
+    }
+
+    #[Override]
+    public function getStatus(): ?string
+    {
+        $status = parent::getStatus();
+
+        if ($status === self::STATUS_ENABLED && $this->postDate) {
+            $currentTime = time();
+            $postDate = $this->postDate->getTimestamp();
+            $expiryDate = $this->expiryDate?->getTimestamp();
+
+            if ($postDate <= $currentTime && ($expiryDate === null || $expiryDate > $currentTime)) {
+                return self::STATUS_LIVE;
             }
 
-            if ($canManage) {
-                // Allow deletion
-                $deleteAction = Craft::$app->getElements()->createAction([
-                    'type' => Delete::class,
-                    'confirmationMessage' => Craft::t('digital-products', 'Are you sure you want to delete the selected products?'),
-                    'successMessage' => Craft::t('digital-products', 'Products deleted.'),
-                ]);
-                $actions[] = $deleteAction;
-                $actions[] = SetStatus::class;
+            if ($postDate > $currentTime) {
+                return self::STATUS_PENDING;
             }
+
+            return self::STATUS_EXPIRED;
         }
 
-        return $actions;
+        return $status;
     }
 
     /**
-     * @inheritdoc
+     * A digital product can be bought while it is live and available for purchase.
      */
-    public function canView(User $user): bool
+    #[Override]
+    public function getIsAvailable(): bool
     {
-        return $this->_canManageProductType($user);
+        return $this->availableForPurchase
+            && $this->getStatus() === self::STATUS_LIVE
+            && ! PurchasableHelper::isTempSku($this->getSku());
     }
 
-    /**
-     * @inheritdoc
-     */
-    public function canSave(User $user): bool
+    #[Override]
+    public function getIsShippable(): bool
     {
-        return $this->_canManageProductType($user);
+        return false;
     }
 
-    /**
-     * @inheritdoc
-     */
-    public function canDelete(User $user): bool
+    #[Override]
+    public function hasFreeShipping(): bool
     {
-        return $this->_canManageProductType($user);
+        return true;
     }
 
-    /**
-     * @param User $user
-     * @return bool
-     */
-    private function _canManageProductType(User $user): bool
+    #[Override]
+    public function getIsPromotable(): bool
     {
-        if (parent::canView($user)) {
-            return true;
+        return $this->promotable;
+    }
+
+    #[Override]
+    public function getSnapshot(): array
+    {
+        return [
+            ...parent::getSnapshot(),
+            'typeId' => $this->typeId,
+            'productType' => $this->typeId ? $this->getType()->handle : null,
+        ];
+    }
+
+    #[Override]
+    public function getPostEditUrl(): ?string
+    {
+        return Url::cpUrl('digital-products/products');
+    }
+
+    #[Override]
+    protected function cpEditUrl(): ?string
+    {
+        if ($this->typeId === null) {
+            return null;
         }
 
-        try {
-            $productType = $this->getType();
-        } catch (\Exception) {
+        $path = sprintf('digital-products/products/%s/%s', $this->getType()->handle, $this->getCanonicalId());
+
+        if ($this->slug && ! str_starts_with($this->slug, '__')) {
+            $path .= '-'.str_replace('/', '-', $this->slug);
+        }
+
+        return $path;
+    }
+
+    #[Override]
+    protected function crumbs(): array
+    {
+        $productType = $this->getType();
+        $items = array_map(fn (ProductType $type) => [
+            'type' => 'link',
+            'label' => t($type->name, category: 'site'),
+            'href' => Url::cpUrl("digital-products/products/$type->handle"),
+            'selected' => $type->id === $productType->id,
+        ], app(ProductTypes::class)->getEditableProductTypes());
+
+        return [
+            new ActionItem()->label(t('Digital Products', category: 'digital-products'))->href(Url::cpUrl('digital-products')),
+            new ActionItem()->label(t('Products', category: 'digital-products'))->href(Url::cpUrl('digital-products/products')),
+            new ActionItem()
+                ->label(t($productType->name, category: 'site'))
+                ->href(Url::cpUrl("digital-products/products/$productType->handle"))
+                ->items(count($items) > 1 ? $items : []),
+        ];
+    }
+
+    #[Override]
+    protected function metaFieldsNodes(bool $static): array
+    {
+        $mode = $static ? ControlMode::Disabled : ControlMode::Editable;
+
+        $slug = Slug::make('slug')
+            ->value(! ElementHelper::isTempSlug($this->slug) ? $this->slug : null)
+            ->mode($mode);
+
+        if (! $static) {
+            $slug->source('title')->autoGenerate(
+                $this->isProvisionalDraft || $this->slug === null || ElementHelper::isTempSlug($this->slug),
+            );
+        }
+
+        return [
+            Field::make(t('Slug'))->control($slug),
+            Field::make(t('Post Date', category: 'digital-products'))
+                ->control(DateTimeControl::make('postDate')
+                    ->showTime()
+                    ->minuteIncrement(1)
+                    ->value(self::dateTimeControlValue($this->postDate))
+                    ->mode($mode)),
+            Field::make(t('Expiry Date', category: 'digital-products'))
+                ->control(DateTimeControl::make('expiryDate')
+                    ->showTime()
+                    ->minuteIncrement(1)
+                    ->value(self::dateTimeControlValue($this->expiryDate))
+                    ->mode($mode)),
+            ...parent::metaFieldsNodes($static),
+        ];
+    }
+
+    #[Override]
+    protected function metaFieldsHtml(bool $static): string
+    {
+        return implode("\n", [
+            $this->slugFieldHtml($static),
+            FormFields::dateTimeFieldHtml([
+                'status' => $this->getAttributeStatus('postDate'),
+                'label' => t('Post Date', category: 'digital-products'),
+                'id' => 'postDate',
+                'name' => 'postDate',
+                'value' => $this->postDate,
+                'errors' => $this->errors()->get('postDate'),
+                'disabled' => $static,
+            ]),
+            FormFields::dateTimeFieldHtml([
+                'status' => $this->getAttributeStatus('expiryDate'),
+                'label' => t('Expiry Date', category: 'digital-products'),
+                'id' => 'expiryDate',
+                'name' => 'expiryDate',
+                'value' => $this->expiryDate,
+                'errors' => $this->errors()->get('expiryDate'),
+                'disabled' => $static,
+            ]),
+            parent::metaFieldsHtml($static),
+        ]);
+    }
+
+    #[Override]
+    protected function attributeHtml(string $attribute): string
+    {
+        return match ($attribute) {
+            'type' => $this->typeId ? Html::encode(t($this->getType()->name, category: 'site')) : '',
+            'promotable' => $this->promotable ? Html::tag('span', '', [
+                'class' => 'checkbox-icon',
+                'role' => 'img',
+                'title' => t('Yes', category: 'digital-products'),
+            ]) : '',
+            default => (string) parent::attributeHtml($attribute),
+        };
+    }
+
+    /**
+     * Generates the SKU from the product type's SKU format when none was given.
+     */
+    #[Override]
+    public function prepareForValidation(): void
+    {
+        $this->generateSku();
+    }
+
+    #[Override]
+    public function beforeSave(bool $isNew): bool
+    {
+        if (! $this->postDate && ($this->enabled && $this->getEnabledForSite())) {
+            $this->postDate = DateTime::createFromInterface(now());
+        }
+
+        $this->generateSku();
+
+        return parent::beforeSave($isNew);
+    }
+
+    #[Override]
+    public function afterSave(bool $isNew): void
+    {
+        if (! $this->propagating) {
+            $record = $isNew ? null : ProductRecord::query()->find($this->id);
+
+            if (! $isNew && ! $record) {
+                throw new RuntimeException('Invalid digital product ID: '.$this->id);
+            }
+
+            $record ??= new ProductRecord(['id' => $this->id]);
+            $record->typeId = $this->typeId;
+            $record->taxCategoryId = $this->getTaxCategoryId();
+            $record->postDate = Query::prepareDateForDb($this->postDate);
+            $record->expiryDate = Query::prepareDateForDb($this->expiryDate);
+            $record->promotable = $this->promotable;
+
+            // Keep the dates in sync with the element row
+            $record->dateCreated = Query::prepareDateForDb($this->dateCreated ?? now());
+            $record->dateUpdated = Query::prepareDateForDb($this->dateUpdated ?? now());
+
+            $dirtyAttributes = array_keys($record->getDirty());
+            $record->save();
+
+            $this->setDirtyAttributes($dirtyAttributes);
+        }
+
+        parent::afterSave($isNew);
+    }
+
+    /**
+     * Products with licenses can't be deleted.
+     */
+    #[Override]
+    public function beforeDelete(): bool
+    {
+        if ($this->id && $this->getIsCanonical() && License::find()->productId($this->id)->status(null)->exists()) {
+            $this->errors()->add('id', t('Couldn’t delete product with existing licenses.', category: 'digital-products'));
+
             return false;
         }
 
-        return $user->can('digitalProducts-manageProductType:' . $productType->uid);
+        return parent::beforeDelete();
+    }
+
+    private function generateSku(): void
+    {
+        if (($this->getSku() !== '' && ! PurchasableHelper::isTempSku($this->getSku())) || $this->typeId === null) {
+            return;
+        }
+
+        $skuFormat = $this->getType()->skuFormat;
+
+        if (! $skuFormat) {
+            return;
+        }
+
+        try {
+            $language = $this->getSite()->getLanguage();
+            $sku = I18N::withLocale($language, $language, fn () => renderSandboxedObjectTemplate($skuFormat, $this));
+        } catch (Throwable $e) {
+            Log::error('Digital Products could not generate the supplied SKU format: '.$e->getMessage());
+
+            return;
+        }
+
+        if ($sku === '') {
+            return;
+        }
+
+        // Append a sequence number if another purchasable already uses the SKU
+        $baseSku = $sku;
+
+        while ($this->skuExists($sku)) {
+            $sku = $baseSku.'-'.Sequence::next('sku::'.$baseSku);
+        }
+
+        $this->setSku($sku);
+    }
+
+    private function skuExists(string $sku): bool
+    {
+        return DB::table(CommerceTable::PURCHASABLES)
+            ->where('sku', $sku)
+            ->when($this->id, fn ($query) => $query->where('id', '!=', $this->getCanonicalId()))
+            ->exists();
+    }
+
+    /**
+     * @return array{date: string, time: string, timezone: string}
+     */
+    private static function dateTimeControlValue(?DateTimeInterface $value): array
+    {
+        return [
+            'date' => $value?->format('Y-m-d') ?? '',
+            'time' => $value?->format('H:i') ?? '',
+            'timezone' => $value?->getTimezone()->getName() ?? Cms::timezone(),
+        ];
     }
 }

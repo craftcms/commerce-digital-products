@@ -1,41 +1,32 @@
 <?php
 
-namespace craft\digitalproducts\records;
+declare(strict_types=1);
 
-use craft\db\ActiveRecord;
-use craft\records\FieldLayout;
-use yii\db\ActiveQueryInterface;
+namespace CraftCms\DigitalProducts\Models;
+
+use CraftCms\Cms\Shared\BaseModel;
+use CraftCms\Cms\Shared\Concerns\HasUid;
+use CraftCms\DigitalProducts\Database\Table;
 
 /**
- * Product Type record.
+ * Row in `digitalproducts_producttypes`.
  *
- * @property int $id            Product type id
- * @property int|null $fieldLayoutId Field layout id
- * @property string $name          Product type name
- * @property string $handle        Product type handle
- * @property string $skuFormat     SKU format
- * @property FieldLayout $fieldLayout   Field layout
- *
- * @author    Pixel & Tonic, Inc. <support@pixelandtonic.com>
- * @copyright Copyright (c) 2016, Pixel & Tonic, Inc.
+ * @property int $id
+ * @property int|null $fieldLayoutId
+ * @property string $name
+ * @property string $handle
+ * @property string|null $skuFormat
+ * @property string $uid
  */
-class ProductType extends ActiveRecord
+class ProductType extends BaseModel
 {
-    /**
-     * @inheritdoc
-     */
-    public static function tableName(): string
-    {
-        return '{{%digitalproducts_producttypes}}';
-    }
+    use HasUid;
 
-    /**
-     * Return the product type's field layout.
-     *
-     * @return ActiveQueryInterface The relational query object.
-     */
-    public function getFieldLayout(): ActiveQueryInterface
-    {
-        return $this->hasOne(FieldLayout::class, ['id' => 'fieldLayoutId']);
-    }
+    #[\Override]
+    protected $table = Table::PRODUCT_TYPES;
+
+    #[\Override]
+    protected $casts = [
+        'fieldLayoutId' => 'integer',
+    ];
 }

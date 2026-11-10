@@ -1,163 +1,194 @@
 <?php
 
-namespace craft\digitalproducts\services;
+declare(strict_types=1);
 
-use Craft;
-use craft\commerce\elements\Order;
-use craft\commerce\events\ProcessPaymentEvent;
-use craft\digitalproducts\elements\License;
-use craft\digitalproducts\elements\Product;
-use craft\digitalproducts\Plugin as DigitalProducts;
-use craft\events\UserEvent;
-use yii\base\Component;
-use yii\base\Event;
+namespace CraftCms\DigitalProducts;
+
+use CraftCms\Cms\FieldLayout\FieldLayout;
+use CraftCms\Cms\ProjectConfig\Events\ConfigEvent;
+use CraftCms\Cms\ProjectConfig\ProjectConfigHelper;
+use CraftCms\Cms\Support\Facades\ElementCaches;
+use CraftCms\Cms\Support\Facades\Elements;
+use CraftCms\Cms\Support\Facades\Fields;
+use CraftCms\Cms\User\Elements\User;
+use CraftCms\Commerce\Order\Elements\Order;
+use CraftCms\DigitalProducts\Elements\License;
+use CraftCms\DigitalProducts\Elements\Product;
+use CraftCms\DigitalProducts\Events\LicenseKeyGenerating;
+use Illuminate\Container\Attributes\Singleton;
 
 /**
- * Licenses service.
- *
- * @author    Pixel & Tonic, Inc. <support@pixelandtonic.com>
- * @copyright Copyright (c) 2016, Pixel & Tonic, Inc.
+ * Issues and looks up licenses.
  */
-class Licenses extends Component
+#[Singleton]
+class Licenses
 {
     /**
-     * Returns true if a given license key is unique.
-     *
-     * @param string $licenseKey the license key
-     * @return bool
+     * Prefix of the placeholder key a license holds until it has a product.
      */
-    public function isLicenseKeyUnique(string $licenseKey): bool
+    public const string TEMP_KEY_PREFIX = '__temp_';
+
+    /**
+     * Project config path of the license field layout.
+     */
+    public const string CONFIG_FIELDLAYOUT_KEY = 'digital-products.licenseFieldLayouts';
+
+    public function __construct(
+        private readonly Settings $settings,
+    ) {}
+
+    /**
+     * Applies a changed license field layout from project config.
+     */
+    public function handleChangedFieldLayout(ConfigEvent $event): void
     {
-        return !License::find()
-            ->licenseKey($licenseKey)
-            ->status(null)
-            ->exists();
+        $data = $event->newValue;
+
+        ProjectConfigHelper::ensureAllFieldsProcessed();
+
+        if (empty($data) || empty(reset($data))) {
+            Fields::deleteLayoutsByType(License::class);
+
+            return;
+        }
+
+        $layout = FieldLayout::createFromConfig(reset($data));
+        $layout->id = Fields::getLayoutByType(License::class)->id;
+        $layout->type = License::class;
+        $layout->uid = key($data);
+        Fields::saveLayout($layout, false);
+
+        ElementCaches::invalidateForElementType(License::class);
     }
 
     /**
-     * Sort through the ordered items and generate Licenses for Digital Products.
-     *
-     * @param Event $event
+     * Deletes the license field layout when it is removed from project config.
      */
-    public static function handleCompletedOrder(Event $event): void
+    public function handleDeletedFieldLayout(): void
     {
-        /** @var Order $order */
-        $order = $event->sender;
-        $lineItems = $order->getLineItems();
+        Fields::deleteLayoutsByType(License::class);
+    }
 
-        foreach ($lineItems as $lineItem) {
-            // Could be deleted line item
-            if ($itemId = $lineItem->purchasableId) {
-                $element = Craft::$app->getElements()->getElementById($itemId);
-                $quantity = $lineItem->qty;
+    /**
+     * Creates one license per purchased digital product unit in an order.
+     *
+     * @return License[] The licenses that were created.
+     */
+    public function licenseOrder(Order $order): array
+    {
+        $licenses = [];
 
-                if ($element instanceof Product) {
-                    /** @var Product $element */
-                    for ($i = 0; $i < $quantity; $i++) {
-                        DigitalProducts::getInstance()->getLicenses()->licenseProductByOrder($element, $order);
-                    }
+        foreach ($order->getLineItems() as $lineItem) {
+            // The purchasable could have been deleted
+            if (! $lineItem->purchasableId) {
+                continue;
+            }
+
+            $product = Product::find()->id($lineItem->purchasableId)->status(null)->one();
+
+            if (! $product) {
+                continue;
+            }
+
+            for ($i = 0; $i < $lineItem->qty; $i++) {
+                if ($license = $this->licenseProductByOrder($product, $order)) {
+                    $licenses[] = $license;
                 }
             }
         }
+
+        return $licenses;
     }
 
     /**
-     * Prevent paying for orders with digital products in it if user not logged in when required by config.
-     *
-     * @param ProcessPaymentEvent $event
+     * Creates a license for a product bought in an order.
      */
-    public static function maybePreventPayment(ProcessPaymentEvent $event): void
+    public function licenseProductByOrder(Product $product, Order $order): ?License
     {
-        if (!DigitalProducts::getInstance()->getSettings()->requireLoggedInUser || !Craft::$app->getUser()->getIsGuest()) {
-            return;
-        }
-
-        /** @var Order|null $order */
-        $order = $event->order;
-
-        if (!$order) {
-            return;
-        }
-
-        $lineItems = $order->getLineItems();
-
-        foreach ($lineItems as $lineItem) {
-            $itemId = $lineItem->purchasableId;
-            $element = Craft::$app->getElements()->getElementById($itemId);
-
-            if ($element instanceof Product) {
-                $event->isValid = false;
-
-                return;
-            }
-        }
-    }
-
-    /**
-     * Assign licenses to a just-activated user, if emails match and config allows it.
-     *
-     * @param UserEvent $event
-     */
-    public static function handleUserActivation(UserEvent $event): void
-    {
-        if (!DigitalProducts::getInstance()->getSettings()->autoAssignLicensesOnUserRegistration) {
-            return;
-        }
-
-        $licenses = License::find()->ownerEmail($event->user->email)->all();
-
-        /** @var License $license */
-        foreach ($licenses as $license) {
-            // Only licenses with unassigned users
-            if (!$license->userId) {
-                $license->userId = $event->user->id;
-                Craft::$app->getElements()->saveElement($license);
-            }
-        }
-    }
-
-    /**
-     * Generate a license for a Product per Order.
-     *
-     * @param Product $product
-     * @param Order $order
-     * @return bool
-     */
-    public function licenseProductByOrder(Product $product, Order $order): bool
-    {
-        $license = new License();
-        $license->productId = $product->id;
         $customer = $order->getCustomer();
 
-        if (!$customer) {
-            return false;
+        if (! $customer) {
+            return null;
         }
 
+        $license = new License;
+        $license->productId = $product->id;
         $license->ownerEmail = $customer->email;
         $license->ownerName = $customer->getName();
         $license->userId = $customer->id;
-
         $license->orderId = $order->id;
 
-        return Craft::$app->getElements()->saveElement($license);
+        return Elements::saveElement($license) ? $license : null;
     }
 
     /**
-     * Generate a license key.
-     *
-     * @return string
+     * Whether the order has a digital product in it.
+     */
+    public function orderHasDigitalProducts(Order $order): bool
+    {
+        $purchasableIds = array_filter(array_map(fn ($lineItem) => $lineItem->purchasableId, $order->getLineItems()));
+
+        return $purchasableIds !== [] && Product::find()->id($purchasableIds)->status(null)->exists();
+    }
+
+    /**
+     * Assigns unowned licenses with a matching email to a user.
+     */
+    public function assignLicensesToUser(User $user): void
+    {
+        if (! $user->email) {
+            return;
+        }
+
+        $licenses = License::find()->ownerEmail($user->email)->ownerId(':empty:')->status(null)->all();
+
+        foreach ($licenses as $license) {
+            $license->userId = $user->id;
+            Elements::saveElement($license);
+        }
+    }
+
+    /**
+     * Returns the key for a new license: the one already set on it, one supplied by a
+     * {@see LicenseKeyGenerating} listener, or a new unique random key.
+     */
+    public function generateLicenseKeyFor(License $license): string
+    {
+        if ($license->hasLicenseKey()) {
+            return $license->licenseKey;
+        }
+
+        event($event = new LicenseKeyGenerating($license));
+
+        if ($event->licenseKey !== null && $event->licenseKey !== '') {
+            return $event->licenseKey;
+        }
+
+        do {
+            $licenseKey = $this->generateLicenseKey();
+        } while (! $this->isLicenseKeyUnique($licenseKey));
+
+        return $licenseKey;
+    }
+
+    /**
+     * Generates a random license key from the configured characters and length.
      */
     public function generateLicenseKey(): string
     {
-        $codeAlphabet = DigitalProducts::getInstance()->getSettings()->licenseKeyCharacters;
-        $keyLength = DigitalProducts::getInstance()->getSettings()->licenseKeyLength;
-
+        $characters = $this->settings->licenseKeyCharacters;
+        $max = mb_strlen($characters) - 1;
         $licenseKey = '';
 
-        for ($i = 0; $i < $keyLength; $i++) {
-            $licenseKey .= $codeAlphabet[random_int(0, strlen($codeAlphabet) - 1)];
+        for ($i = 0; $i < $this->settings->licenseKeyLength; $i++) {
+            $licenseKey .= mb_substr($characters, random_int(0, $max), 1);
         }
 
         return $licenseKey;
+    }
+
+    public function isLicenseKeyUnique(string $licenseKey): bool
+    {
+        return ! License::find()->licenseKey($licenseKey)->status(null)->trashed(null)->exists();
     }
 }

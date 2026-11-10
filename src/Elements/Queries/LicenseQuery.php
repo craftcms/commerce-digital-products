@@ -1,168 +1,155 @@
 <?php
 
-namespace craft\digitalproducts\elements\db;
+declare(strict_types=1);
 
-use craft\base\Element;
-use craft\db\Query;
-use craft\digitalproducts\elements\License;
-use craft\digitalproducts\elements\Product;
-use craft\digitalproducts\models\ProductType;
-use craft\elements\db\ElementQuery;
-use craft\elements\User;
-use craft\helpers\ArrayHelper;
-use craft\helpers\Db;
-use DateTime;
+namespace CraftCms\DigitalProducts\Elements\Queries;
+
+use CraftCms\Cms\Database\Table as CraftTable;
+use CraftCms\Cms\Element\Queries\ElementQuery;
+use CraftCms\Cms\Element\Queries\Exceptions\QueryAbortedException;
+use CraftCms\Cms\Support\Arr;
+use CraftCms\Cms\User\Elements\User;
+use CraftCms\DigitalProducts\Data\ProductType;
+use CraftCms\DigitalProducts\Database\Table;
+use CraftCms\DigitalProducts\Elements\License;
+use CraftCms\DigitalProducts\Elements\Product;
 use DateTimeInterface;
-use yii\db\Connection;
+use Illuminate\Database\Query\Builder;
+use Illuminate\Support\Facades\DB;
+use Override;
+use Tpetry\QueryExpressions\Language\Alias;
 
 /**
- * LicenseQuery represents a SELECT SQL statement for products in a way that is independent of DBMS.
+ * Queries licenses.
  *
- * @method License[]|array all($db = null)
- * @method License|array|false one($db = null)
- * @method License|array|false nth(int $n, Connection $db = null)
+ * @extends ElementQuery<License>
  *
- * @author Pixel & Tonic, Inc. <support@pixelandtonic.com>
- * @since  2.0
+ * @method License|null one($db = null)
+ * @method License[] all($db = null)
  */
 class LicenseQuery extends ElementQuery
 {
-    /**
-     * @var string|null Either owner or user email on the license
-     */
+    #[Override]
+    protected string $table = Table::LICENSES;
+
+    #[Override]
+    protected array $defaultOrderBy = [
+        'elements.dateCreated' => SORT_DESC,
+        'elements.id' => SORT_DESC,
+    ];
+
+    /** Matches the owner email or the owning user's email. */
     public ?string $email = null;
 
-    /**
-     * @var string|null Email of the license owner
-     */
-    public ?string $ownerEmail = null;
+    public mixed $ownerEmail = null;
 
-    /**
-     * @var string|null Email of the user that owns the license
-     */
-    public ?string $userEmail = null;
+    public mixed $userEmail = null;
 
-    /**
-     * @var int|int[]|null The user id for the user that the license belongs to.
-     */
-    public array|int|null $ownerId = null;
+    public mixed $ownerId = null;
 
-    /**
-     * @var int|int[]|null The product id for the product that is licensed
-     */
-    public array|int|null $productId = null;
+    public mixed $productId = null;
 
-    /**
-     * @var int|int[]|null The product type id for the product that is licensed
-     */
-    public array|int|null $typeId = null;
+    public mixed $typeId = null;
 
-    /**
-     * @var int|string|null The license date on the license
-     */
-    public int|string|null $licenseDate = null;
+    public mixed $orderId = null;
 
-    /**
-     * @var int|null The id of the order that the license must be a part of.
-     */
-    public ?int $orderId = null;
+    public mixed $licenseKey = null;
 
-    /**
-     * @var string|null The license key.
-     */
-    public ?string $licenseKey = null;
+    public mixed $licenseDate = null;
 
-    /**
-     * @inheritdoc
-     */
-    public function __construct(string $elementType, array $config = [])
+    /** @param array<string, mixed> $config */
+    public function __construct(array $config = [])
     {
-        // Default status
-        if (!isset($config['status'])) {
-            $config['status'] = Element::STATUS_ENABLED;
-        }
+        parent::__construct(License::class, $config);
 
-        parent::__construct($elementType, $config);
+        $this->query->leftJoin(new Alias(Table::PRODUCTS, Table::PRODUCTS), Table::PRODUCTS.'.id', '=', Table::LICENSES.'.productId');
+        $this->query->leftJoin(new Alias(CraftTable::USERS, 'license_users'), 'license_users.id', '=', Table::LICENSES.'.userId');
+
+        $this->query->addSelect([
+            Table::LICENSES.'.productId',
+            Table::LICENSES.'.orderId',
+            Table::LICENSES.'.licenseKey',
+            Table::LICENSES.'.ownerName',
+            Table::LICENSES.'.ownerEmail',
+            Table::LICENSES.'.userId',
+        ]);
+
+        $this->beforeQuery(static function (self $query) {
+            if ($query->typeId === []) {
+                throw new QueryAbortedException;
+            }
+
+            if ($query->email) {
+                $email = $query->email;
+                $query->where(fn (Builder $q) => $q
+                    ->where(Table::LICENSES.'.ownerEmail', $email)
+                    ->orWhere('license_users.email', $email));
+            }
+
+            if ($query->ownerEmail) {
+                $query->whereParam(Table::LICENSES.'.ownerEmail', $query->ownerEmail);
+            }
+
+            if ($query->userEmail) {
+                $query->whereParam('license_users.email', $query->userEmail);
+            }
+
+            if ($query->ownerId) {
+                $query->whereParam(Table::LICENSES.'.userId', $query->ownerId);
+            }
+
+            if ($query->productId) {
+                $query->whereParam(Table::LICENSES.'.productId', $query->productId);
+            }
+
+            if ($query->typeId) {
+                $query->whereParam(Table::PRODUCTS.'.typeId', $query->typeId);
+            }
+
+            if ($query->orderId) {
+                $query->whereParam(Table::LICENSES.'.orderId', $query->orderId);
+            }
+
+            if ($query->licenseKey) {
+                $query->whereParam(Table::LICENSES.'.licenseKey', $query->licenseKey);
+            }
+
+            if ($query->licenseDate) {
+                $query->whereDateParam('elements.dateCreated', $query->licenseDate);
+            }
+        });
     }
 
-    /**
-     * @inheritdoc
-     */
-    public function __set($name, $value)
-    {
-        switch ($name) {
-            case 'owner':
-                $this->owner($value);
-                break;
-            case 'product':
-                $this->product($value);
-                break;
-            case 'type':
-                $this->type($value);
-                break;
-            case 'before':
-                $this->before($value);
-                break;
-            case 'after':
-                $this->after($value);
-                break;
-            default:
-                parent::__set($name, $value);
-        }
-    }
-
-    /**
-     * Sets the [[email]] property.
-     *
-     * @param string|null $value The property value
-     * @return static self reference
-     */
-    public function email(?string $value): LicenseQuery
+    public function email(?string $value): static
     {
         $this->email = $value;
+
         return $this;
     }
 
-    /**
-     * Sets the [[ownerEmail]] property.
-     *
-     * @param string|null $value The property value
-     * @return static self reference
-     */
-    public function ownerEmail(?string $value): LicenseQuery
+    public function ownerEmail(mixed $value): static
     {
         $this->ownerEmail = $value;
+
         return $this;
     }
 
-    /**
-     * Sets the [[userEmail]] property.
-     *
-     * @param string|null $value The property value
-     * @return static self reference
-     */
-    public function userEmail(?string $value): LicenseQuery
+    public function userEmail(mixed $value): static
     {
         $this->userEmail = $value;
+
         return $this;
     }
 
     /**
-     * Sets the [[productId]] property based on a given product or the sku.
-     *
-     * @param User|string|null $value
-     * @return static self reference
+     * Narrows the query results to licenses owned by a user, by {@see User} or username.
      */
-    public function owner(User|string|null $value): LicenseQuery
+    public function owner(User|string|null $value): static
     {
         if ($value instanceof User) {
             $this->ownerId = $value->id;
         } elseif ($value !== null) {
-            $this->ownerId = (new Query())
-                ->select(['id'])
-                ->from(['{{%users}}'])
-                ->where(Db::parseParam('username', $value))
-                ->column();
+            $this->ownerId = DB::table(CraftTable::USERS)->whereParam('username', $value)->pluck('id')->all() ?: [0];
         } else {
             $this->ownerId = null;
         }
@@ -170,22 +157,22 @@ class LicenseQuery extends ElementQuery
         return $this;
     }
 
+    public function ownerId(mixed $value): static
+    {
+        $this->ownerId = $value;
+
+        return $this;
+    }
+
     /**
-     * Sets the [[productId]] property based on a given product or SKU(s).
-     *
-     * @param Product|string|string[]|null $value
-     * @return static self reference
+     * Narrows the query results to licenses for a product, by {@see Product} or SKU.
      */
-    public function product(Product|array|string|null $value): LicenseQuery
+    public function product(Product|array|string|null $value): static
     {
         if ($value instanceof Product) {
             $this->productId = $value->id;
         } elseif ($value !== null) {
-            $this->productId = (new Query())
-                ->select(['id'])
-                ->from(['{{%digitalproducts_products}}'])
-                ->where(Db::parseParam('sku', $value))
-                ->column();
+            $this->productId = Product::find()->sku($value)->status(null)->ids() ?: [0];
         } else {
             $this->productId = null;
         }
@@ -193,22 +180,22 @@ class LicenseQuery extends ElementQuery
         return $this;
     }
 
+    public function productId(mixed $value): static
+    {
+        $this->productId = $value;
+
+        return $this;
+    }
+
     /**
-     * Sets the [[typeId]] property based on a given product types(s)’s handle(s).
-     *
-     * @param string|string[]|ProductType|null $value The property value
-     * @return static self reference
+     * Narrows the query results to licenses for products of a type, by {@see ProductType} or handle.
      */
-    public function type(mixed $value): LicenseQuery
+    public function type(mixed $value): static
     {
         if ($value instanceof ProductType) {
             $this->typeId = $value->id;
         } elseif ($value !== null) {
-            $this->typeId = (new Query())
-                ->select(['id'])
-                ->from(['{{%digitalproducts_producttypes}}'])
-                ->where(Db::parseParam('handle', $value))
-                ->column();
+            $this->typeId = DB::table(Table::PRODUCT_TYPES)->whereParam('handle', $value)->pluck('id')->all();
         } else {
             $this->typeId = null;
         }
@@ -216,194 +203,58 @@ class LicenseQuery extends ElementQuery
         return $this;
     }
 
-    /**
-     * Sets the [[postDate]] property to only allow products whose Post Date is before the given value.
-     *
-     * @param DateTime|string $value The property value
-     * @return static self reference
-     */
-    public function before(DateTime|string $value): LicenseQuery
-    {
-        if ($value instanceof DateTime) {
-            $value = $value->format(DateTime::W3C);
-        }
-
-        $this->dateCreated = ArrayHelper::toArray($this->dateCreated);
-        $this->dateCreated[] = '<' . $value;
-
-        return $this;
-    }
-
-    /**
-     * Sets the [[postDate]] property to only allow products whose Post Date is after the given value.
-     *
-     * @param DateTime|string $value The property value
-     * @return static self reference
-     */
-    public function after(DateTime|string $value): LicenseQuery
-    {
-        if ($value instanceof DateTime) {
-            $value = $value->format(DateTime::W3C);
-        }
-
-        $this->dateCreated = ArrayHelper::toArray($this->dateCreated);
-        $this->dateCreated[] = '>=' . $value;
-
-        return $this;
-    }
-
-    /**
-     * Sets the [[typeId]] property.
-     *
-     * @param int|int[] $value The property value
-     * @return static self reference
-     */
-    public function typeId(array|int|null $value): LicenseQuery
+    public function typeId(mixed $value): static
     {
         $this->typeId = $value;
+
         return $this;
     }
 
-    /**
-     * Sets the [[ownerId]] property.
-     *
-     * @param int|int[] $value The property value
-     * @return static self reference
-     */
-    public function ownerId(array|int|null $value): LicenseQuery
-    {
-        $this->ownerId = $value;
-        return $this;
-    }
-
-    /**
-     * Sets the [[productId]] property.
-     *
-     * @param int|int[] $value The property value
-     * @return static self reference
-     */
-    public function productId(array|int|null $value): LicenseQuery
-    {
-        $this->productId = $value;
-        return $this;
-    }
-
-    /**
-     * Sets the [[orderId]] property.
-     *
-     * @param int|int[] $value The property value
-     * @return static self reference
-     */
-    public function orderId(array|int|null $value): LicenseQuery
+    public function orderId(mixed $value): static
     {
         $this->orderId = $value;
+
         return $this;
     }
 
-    /**
-     * Sets the [[licenseKey]] property.
-     *
-     * @param string|string[] $value The property value
-     * @return static self reference
-     */
-    public function licenseKey(array|string|null $value): LicenseQuery
+    public function licenseKey(mixed $value): static
     {
         $this->licenseKey = $value;
+
         return $this;
     }
 
     /**
-     * Sets the [[licenseDate]] property.
-     *
-     * @param DateTime|string $value The property value
-     * @return static self reference
+     * Narrows the query results based on the license issue date.
      */
-    public function licenseDate(DateTime|string $value): LicenseQuery
+    public function licenseDate(mixed $value): static
     {
-        if ($value instanceof DateTime) {
+        $this->licenseDate = $value instanceof DateTimeInterface ? $value->format(DateTimeInterface::W3C) : $value;
+
+        return $this;
+    }
+
+    public function before(DateTimeInterface|string $value): static
+    {
+        if ($value instanceof DateTimeInterface) {
             $value = $value->format(DateTimeInterface::W3C);
         }
 
-        $this->licenseDate = $value;
+        $this->licenseDate = Arr::wrap($this->licenseDate);
+        $this->licenseDate[] = '<'.$value;
+
         return $this;
     }
 
-    /**
-     * @inheritdoc
-     */
-    protected function beforePrepare(): bool
+    public function after(DateTimeInterface|string $value): static
     {
-        // See if 'type' were set to invalid handles
-        if ($this->typeId === []) {
-            return false;
+        if ($value instanceof DateTimeInterface) {
+            $value = $value->format(DateTimeInterface::W3C);
         }
 
-        $this->joinElementTable('digitalproducts_licenses');
-        $this->subQuery->leftJoin('{{%digitalproducts_products}} digitalproducts_products', '[[digitalproducts_licenses.productId]] = [[digitalproducts_products.id]]');
-        $this->subQuery->leftJoin('{{%users}} users', '[[digitalproducts_licenses.userId]] = [[users.id]]');
+        $this->licenseDate = Arr::wrap($this->licenseDate);
+        $this->licenseDate[] = '>='.$value;
 
-        $this->query->select([
-            'digitalproducts_licenses.id',
-            'digitalproducts_licenses.productId',
-            'digitalproducts_licenses.licenseKey',
-            'digitalproducts_licenses.ownerName',
-            'digitalproducts_licenses.ownerEmail',
-            'digitalproducts_licenses.userId',
-            'digitalproducts_licenses.orderId',
-        ]);
-
-        if ($this->email) {
-            $this->subQuery->andWhere(['or', ['digitalproducts_licenses.ownerEmail' => $this->email], ['users.email' => $this->email]]);
-        }
-
-        if ($this->ownerEmail) {
-            $this->subQuery->andWhere(Db::parseParam('digitalproducts_licenses.ownerEmail', $this->ownerEmail));
-        }
-
-        if ($this->userEmail) {
-            $this->subQuery->andWhere(Db::parseParam('users.email', $this->userEmail));
-        }
-
-        if ($this->ownerId) {
-            $this->subQuery->andWhere(Db::parseParam('digitalproducts_licenses.userId', $this->ownerId));
-        }
-
-        if ($this->productId) {
-            $this->subQuery->andWhere(Db::parseParam('digitalproducts_products.id', $this->productId));
-        }
-
-        if ($this->typeId) {
-            $this->subQuery->andWhere(Db::parseParam('digitalproducts_products.typeId', $this->typeId));
-        }
-
-        if ($this->licenseDate) {
-            $this->subQuery->andWhere(Db::parseDateParam('digitalproducts_products.dateCreated', $this->licenseDate));
-        }
-
-        if ($this->orderId) {
-            $this->subQuery->andWhere(Db::parseParam('digitalproducts_licenses.orderId', $this->orderId));
-        }
-
-        if ($this->licenseKey) {
-            $this->subQuery->andWhere(Db::parseParam('digitalproducts_licenses.licenseKey', $this->licenseKey));
-        }
-
-        return parent::beforePrepare();
-    }
-
-    /**
-     * @inheritdoc
-     */
-    protected function statusCondition(string $status): mixed
-    {
-        return match ($status) {
-            Element::STATUS_ENABLED => [
-                'elements.enabled' => '1',
-            ],
-            License::STATUS_DISABLED => [
-                'elements.disabled' => '1',
-            ],
-            default => parent::statusCondition($status),
-        };
+        return $this;
     }
 }

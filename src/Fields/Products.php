@@ -1,40 +1,58 @@
 <?php
 
-namespace craft\digitalproducts\fields;
+declare(strict_types=1);
 
-use Craft;
-use craft\digitalproducts\elements\Product;
-use craft\fields\BaseRelationField;
+namespace CraftCms\DigitalProducts\Fields;
+
+use CraftCms\Cms\Field\BaseRelationField;
+use CraftCms\Cms\Gql\Gql as GqlService;
+use CraftCms\Cms\Gql\GqlHelper;
+use CraftCms\DigitalProducts\Elements\Product;
+use CraftCms\DigitalProducts\Gql\Arguments\Elements\Product as ProductArguments;
+use CraftCms\DigitalProducts\Gql\Interfaces\Elements\Product as ProductInterface;
+use CraftCms\DigitalProducts\Gql\Resolvers\Elements\Product as ProductResolver;
+use GraphQL\Type\Definition\Type;
+use Override;
+
+use function CraftCms\Cms\t;
 
 /**
- * Class Digital Product Field
- *
- * @author    Pixel & Tonic, Inc. <support@pixelandtonic.com>
- * @since     2.0
+ * Relates digital products to other elements.
  */
 class Products extends BaseRelationField
 {
-    /**
-     * @inheritdoc
-     */
+    #[Override]
     public static function displayName(): string
     {
-        return Craft::t('commerce', 'Digital Products');
+        return t('Digital Products', category: 'digital-products');
     }
 
-    /**
-     * @inheritdoc
-     */
+    #[Override]
+    public static function icon(): string
+    {
+        return 'file-arrow-down';
+    }
+
+    #[Override]
+    public static function defaultSelectionLabel(): string
+    {
+        return t('Add a digital product', category: 'digital-products');
+    }
+
     public static function elementType(): string
     {
         return Product::class;
     }
 
-    /**
-     * @inheritdoc
-     */
-    public static function defaultSelectionLabel(): string
+    #[Override]
+    public function getContentGqlType(): array|Type
     {
-        return Craft::t('commerce', 'Add a digital product');
+        return [
+            'name' => $this->handle,
+            'type' => Type::listOf(ProductInterface::getType()),
+            'args' => ProductArguments::getArguments(),
+            'resolve' => ProductResolver::class.'::resolve',
+            'complexity' => GqlHelper::relatedArgumentComplexity(GqlService::GRAPHQL_COMPLEXITY_EAGER_LOAD),
+        ];
     }
 }

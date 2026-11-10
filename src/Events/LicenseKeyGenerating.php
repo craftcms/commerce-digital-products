@@ -1,25 +1,21 @@
 <?php
 
-namespace craft\digitalproducts\events;
+declare(strict_types=1);
 
-use craft\digitalproducts\elements\License;
-use yii\base\Event;
+namespace CraftCms\DigitalProducts\Events;
+
+use CraftCms\DigitalProducts\Elements\License;
 
 /**
- * Class GenerateLicenseKeyEvent
+ * Dispatched before a license key is generated for a new license. See UPGRADE.md for the 5.x event it replaces.
  *
- * @author Pixel & Tonic, Inc. <support@pixelandtonic.com>
- * @since  2.0
+ * Set `$licenseKey` to supply the key yourself; otherwise one is generated
+ * from the `licenseKeyCharacters` and `licenseKeyLength` settings.
  */
-class GenerateKeyEvent extends Event
+class LicenseKeyGenerating
 {
-    /**
-     * @var License The license information
-     */
-    public $license;
-
-    /**
-     * @var string License key to use
-     */
-    public $licenseKey;
+    public function __construct(
+        public License $license,
+        public ?string $licenseKey = null,
+    ) {}
 }

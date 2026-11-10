@@ -1,25 +1,15 @@
 <?php
 
-namespace craft\digitalproducts\events;
+declare(strict_types=1);
 
-use craft\digitalproducts\models\ProductType;
-use yii\base\Event;
+namespace CraftCms\DigitalProducts\Events;
 
-/**
- * Product type event class.
- *
- * @author Pixel & Tonic, Inc. <support@pixelandtonic.com>
- * @since  2.0
- */
-class ProductTypeEvent extends Event
+use CraftCms\DigitalProducts\Data\ProductType;
+
+abstract class ProductTypeEvent
 {
-    /**
-     * @var ProductType|null The product type model associated with the event.
-     */
-    public $productType;
-
-    /**
-     * @var bool Whether the category group is brand new
-     */
-    public $isNew = false;
+    public function __construct(
+        public ProductType $productType,
+        public bool $isNew = false,
+    ) {}
 }

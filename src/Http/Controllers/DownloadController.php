@@ -1,61 +1,51 @@
 <?php
 
-namespace craft\digitalproducts\controllers;
+declare(strict_types=1);
 
-use Craft;
-use craft\digitalproducts\elements\License;
-use craft\elements\Asset;
-use craft\web\Controller as BaseController;
-use yii\web\NotFoundHttpException;
-use yii\web\Response;
+namespace CraftCms\DigitalProducts\Http\Controllers;
+
+use CraftCms\Cms\Asset\Elements\Asset;
+use CraftCms\DigitalProducts\Elements\License;
+use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
- * Download controller.
+ * Streams an asset related to a licensed product to whoever holds the license key.
  *
- * @author Pixel & Tonic, Inc. <support@pixelandtonic.com>
+ * Reached at `actions/digital-products/download/download?licenseKey=…&assetId=…`. The route
+ * is anonymous on purpose: the license key is the credential.
  */
-class DownloadController extends BaseController
+readonly class DownloadController
 {
-    /**
-     * @inheritdoc
-     */
-    protected array|bool|int $allowAnonymous = self::ALLOW_ANONYMOUS_LIVE;
-
-    /**
-     * Streams a licensed asset to the browser without exposing the underlying file URL.
-     *
-     * Requires `licenseKey` and `assetId` request params. The asset must be related
-     * to the product associated with the license.
-     *
-     * @throws NotFoundHttpException if the license key is invalid or the asset is not
-     *   related to the licensed product.
-     */
-    public function actionDownload(): Response
+    public function __invoke(Request $request): StreamedResponse
     {
-        $request = Craft::$app->getRequest();
-        $licenseKey = $request->getRequiredParam('licenseKey');
-        $assetId = (int)$request->getRequiredParam('assetId');
+        $validated = $request->validate([
+            'licenseKey' => ['required', 'string'],
+            'assetId' => ['required', 'integer'],
+        ]);
 
-        $license = License::find()->licenseKey($licenseKey)->one();
+        $license = License::find()->licenseKey($validated['licenseKey'])->one();
+        $product = $license?->getProduct();
 
-        if (!$license) {
-            throw new NotFoundHttpException();
-        }
+        abort_if($product === null, 404);
 
-        /** @var Asset|null $asset */
         $asset = Asset::find()
-            ->id($assetId)
-            ->relatedTo($license->getProduct())
+            ->id((int) $validated['assetId'])
+            ->relatedTo($product)
             ->one();
 
-        if (!$asset) {
-            throw new NotFoundHttpException();
-        }
+        abort_if($asset === null, 404);
 
-        return $this->response->sendStreamAsFile(
-            $asset->getStream(),
-            $asset->filename,
-            ['mimeType' => $asset->getMimeType()]
-        );
+        return response()->streamDownload(function () use ($asset) {
+            $stream = $asset->getStream();
+            fpassthru($stream);
+
+            if (is_resource($stream)) {
+                fclose($stream);
+            }
+        }, $asset->getFilename(), array_filter([
+            'Content-Type' => $asset->getMimeType(),
+            'Content-Length' => $asset->size,
+        ]));
     }
 }

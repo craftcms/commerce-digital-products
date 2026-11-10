@@ -1,40 +1,27 @@
 <?php
-/**
- * @link https://craftcms.com/
- * @copyright Copyright (c) Pixel & Tonic, Inc.
- * @license https://craftcms.github.io/license/
- */
 
-namespace craft\digitalproducts\gql\interfaces\elements;
+declare(strict_types=1);
 
-use Craft;
-use craft\digitalproducts\elements\Product as ProductElement;
-use craft\digitalproducts\gql\types\generators\ProductType;
-use craft\gql\GqlEntityRegistry;
-use craft\gql\interfaces\Element;
+namespace CraftCms\DigitalProducts\Gql\Interfaces\Elements;
+
+use CraftCms\Cms\Gql\GqlEntityRegistry;
+use CraftCms\Cms\Gql\Interfaces\Element;
+use CraftCms\Cms\Support\Facades\Gql;
+use CraftCms\DigitalProducts\Gql\Types\Generators\ProductType;
 use GraphQL\Type\Definition\InterfaceType;
 use GraphQL\Type\Definition\Type;
+use Override;
 
-/**
- * Class Product
- *
- * @author Pixel & Tonic, Inc. <support@pixelandtonic.com>
- * @since 2.4
- */
 class Product extends Element
 {
-    /**
-     * @inheritdoc
-     */
+    #[Override]
     public static function getTypeGenerator(): string
     {
         return ProductType::class;
     }
 
-    /**
-     * @inheritdoc
-     */
-    public static function getType($fields = null): Type
+    #[Override]
+    public static function getType(): Type
     {
         if ($type = GqlEntityRegistry::getEntity(self::getName())) {
             return $type;
@@ -42,11 +29,9 @@ class Product extends Element
 
         $type = GqlEntityRegistry::createEntity(self::getName(), new InterfaceType([
             'name' => static::getName(),
-            'fields' => self::class . '::getFieldDefinitions',
+            'fields' => self::class.'::getFieldDefinitions',
             'description' => 'This is the interface implemented by all digital products.',
-            'resolveType' => function(ProductElement $value) {
-                return $value->getGqlTypeName();
-            },
+            'resolveType' => self::class.'::resolveElementTypeName',
         ]));
 
         ProductType::generateTypes();
@@ -54,20 +39,16 @@ class Product extends Element
         return $type;
     }
 
-    /**
-     * @inheritdoc
-     */
+    #[Override]
     public static function getName(): string
     {
         return 'DigitalProductInterface';
     }
 
-    /**
-     * @inheritdoc
-     */
+    #[Override]
     public static function getFieldDefinitions(): array
     {
-        return Craft::$app->getGql()->prepareFieldDefinitions(array_merge(parent::getFieldDefinitions(), [
+        return Gql::prepareFieldDefinitions(array_merge(parent::getFieldDefinitions(), [
             'price' => [
                 'name' => 'price',
                 'type' => Type::float(),
@@ -76,7 +57,7 @@ class Product extends Element
             'sku' => [
                 'name' => 'sku',
                 'type' => Type::string(),
-                'description' => 'The sku of the digital product.',
+                'description' => 'The SKU of the digital product.',
             ],
             'productTypeId' => [
                 'name' => 'productTypeId',

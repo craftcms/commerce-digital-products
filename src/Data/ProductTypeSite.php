@@ -1,124 +1,70 @@
 <?php
 
-namespace craft\digitalproducts\models;
+declare(strict_types=1);
 
-use Craft;
-use craft\base\Model;
-use craft\digitalproducts\Plugin as DigitalProducts;
-use craft\models\Site;
-use yii\base\InvalidConfigException;
+namespace CraftCms\DigitalProducts\Data;
+
+use CraftCms\Cms\Component\Component;
+use CraftCms\Cms\Site\Data\Site;
+use CraftCms\Cms\Support\Facades\Sites;
+use CraftCms\DigitalProducts\ProductTypes;
+use InvalidArgumentException;
 
 /**
- * Product type locale model class.
- *
- * @author    Pixel & Tonic, Inc. <support@pixelandtonic.com>
- * @copyright Copyright (c) 2016, Pixel & Tonic, Inc.
+ * A product type's settings for one site.
  */
-class ProductTypeSite extends Model
+class ProductTypeSite extends Component
 {
-    /**
-     * @var int ID
-     */
-    public $id;
+    public ?int $id = null;
 
-    /**
-     * @var int Product type ID
-     */
-    public $productTypeId;
+    public ?int $productTypeId = null;
 
-    /**
-     * @var int Site ID
-     */
-    public $siteId;
+    public ?int $siteId = null;
 
-    /**
-     * @var bool Has Urls
-     */
-    public $hasUrls;
+    public bool $hasUrls = false;
 
-    /**
-     * @var string|null URL Format
-     */
-    public $uriFormat;
+    public ?string $uriFormat = null;
 
-    /**
-     * @var string|null Template Path
-     */
-    public $template;
+    public ?string $template = null;
 
-    /**
-     * @var ProductType
-     */
-    private $_productType;
+    public bool $uriFormatIsRequired = true;
 
-    /**
-     * @var bool
-     */
-    public $uriFormatIsRequired = true;
+    private ?ProductType $productType = null;
 
-    /**
-     * @var Site|null
-     */
-    private $_site = null;
+    private ?Site $site = null;
 
-    /**
-     * Returns the Product Type.
-     *
-     * @return ProductType
-     * @throws InvalidConfigException if [[groupId]] is missing or invalid
-     */
     public function getProductType(): ProductType
     {
-        if ($this->_productType !== null) {
-            return $this->_productType;
+        if ($this->productType !== null) {
+            return $this->productType;
         }
 
-        if (!$this->productTypeId) {
-            throw new InvalidConfigException('Site is missing its product type ID');
+        if (! $this->productTypeId) {
+            throw new InvalidArgumentException('Site is missing its product type ID');
         }
 
-        if (($this->_productType = DigitalProducts::getInstance()->getProductTypes()->getProductTypeById($this->productTypeId)) === null) {
-            throw new InvalidConfigException('Invalid product type ID: ' . $this->productTypeId);
-        }
-
-        return $this->_productType;
+        return $this->productType = app(ProductTypes::class)->getProductTypeById($this->productTypeId)
+            ?? throw new InvalidArgumentException('Invalid product type ID: '.$this->productTypeId);
     }
 
-    /**
-     * Sets the Product Type.
-     *
-     * @param ProductType $productType
-     */
-    public function setProductType(ProductType $productType)
+    public function setProductType(ProductType $productType): void
     {
-        $this->_productType = $productType;
+        $this->productType = $productType;
     }
 
-    /**
-     * Gets the associated site.
-     *
-     * @return Site
-     */
     public function getSite(): Site
     {
-        if (!$this->_site) {
-            $this->_site = Craft::$app->getSites()->getSiteById($this->siteId);
-        }
-
-        return $this->_site;
+        return $this->site ??= ($this->siteId ? Sites::getSiteById($this->siteId) : null)
+            ?? throw new InvalidArgumentException('Invalid site ID: '.$this->siteId);
     }
 
-    /**
-     * @inheritdoc
-     */
-    public function rules(): array
+    #[\Override]
+    public function getRules(): array
     {
-        $rules = parent::rules();
-
-        if ($this->uriFormatIsRequired) {
-            $rules[] = ['uriFormat', 'required'];
+        if ($this->uriFormatIsRequired && $this->hasUrls) {
+            return ['uriFormat' => ['required']];
         }
 
-        return $rules;
+        return [];
     }
 }
