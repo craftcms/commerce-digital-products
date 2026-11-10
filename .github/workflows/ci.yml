@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - '4.x'
+      - '6.x'
   pull_request:
 permissions:
   contents: read
@@ -15,10 +15,21 @@ jobs:
     name: ci
     uses: craftcms/.github/.github/workflows/ci.yml@v3
     with:
-      craft_version: '5'
-      jobs: '["ecs", "phpstan", "prettier"]'
+      craft_version: '6'
+      jobs: '["phpstan", "prettier"]'
       notify_slack: true
       slack_subteam: <!subteam^S01CWPYH9D5>
     secrets:
       token: ${{ secrets.GITHUB_TOKEN }}
       slack_webhook_url: ${{ secrets.SLACK_COMMERCE_WEBHOOK_URL }}
+  tests:
+    name: Pint and Pest (PHP 8.5)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.5'
+      - run: composer install --no-interaction --prefer-dist
+      - run: composer check-cs
+      - run: composer test
