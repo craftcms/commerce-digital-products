@@ -8,6 +8,8 @@
     <php>
         <ini name="memory_limit" value="2048M"/>
         <env name="APP_ENV" value="testing"/>
+        <!-- `testbench serve` writes a .env with APP_DEBUG=true into the shared Testbench skeleton; keep tests independent of it. -->
+        <env name="APP_DEBUG" value="false" force="true"/>
         <!-- Public, testing-only key. -->
         <env name="APP_KEY" value="base64:6BDzvwO4hrN7Twv6/gaQ6oZMB/CvpUArZXho189U75E="/>
         <env name="DB_CONNECTION" value="sqlite" force="true"/>

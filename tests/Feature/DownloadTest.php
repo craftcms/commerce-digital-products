@@ -85,6 +85,13 @@ it('streams an asset related to the licensed product', function () {
     expect($response->streamedContent())->toBe('Digital product contents');
 });
 
+it('accepts the parameters in a POST body', function () {
+    $this->post('/actions/digital-products/download/download', [
+        'licenseKey' => $this->license->licenseKey,
+        'assetId' => $this->file->id,
+    ])->assertOk()->assertDownload('manual.txt');
+});
+
 it('returns 404 for an unknown license key', function () {
     $this->get('/actions/digital-products/download/download?'.http_build_query([
         'licenseKey' => 'nope',

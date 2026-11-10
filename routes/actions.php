@@ -14,7 +14,7 @@ use Illuminate\Support\Facades\Route;
 // Routes here are prefixed with `actions/digital-products/`.
 
 // Anonymous by design: the license key is the credential.
-Route::get('download/download', DownloadController::class);
+Route::match(['get', 'post'], 'download/download', DownloadController::class);
 
 Route::middleware('auth')->group(function () {
     Route::middleware('can:digitalProducts-manageProducts')
