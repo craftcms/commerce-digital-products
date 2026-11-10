@@ -97,7 +97,7 @@ it('saves the general settings', function () {
 
     expect(app(ProjectConfig::class)->get('plugins.digital-products.settings.licenseKeyLength'))->toBe(32)
         ->and(app(Settings::class)->licenseKeyCharacters)->toBe('XYZ')
-        ->and(Plugin::getInstance()->getSettings()->requireLoggedInUser)->toBeFalse();
+        ->and(app(Plugin::class)->getSettings()->requireLoggedInUser)->toBeFalse();
 });
 
 it('saves the license field layout to project config', function () {
