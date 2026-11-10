@@ -175,6 +175,13 @@ class ProductTypes
             $productType->id = DB::table(Table::PRODUCT_TYPES)->idByUid($productType->uid);
         }
 
+        // The project config handler saved the field layout, so hand its ID back to the caller's object.
+        $productType->fieldLayoutId = ProductTypeRecord::query()->whereKey($productType->id)->value('fieldLayoutId');
+
+        if ($productType->fieldLayoutId) {
+            $productType->getFieldLayout()->id = $productType->fieldLayoutId;
+        }
+
         return true;
     }
 

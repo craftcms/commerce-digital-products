@@ -328,6 +328,12 @@ class Product extends Purchasable
         return parent::eagerLoadingMap($sourceElements, $handle);
     }
 
+    #[Override]
+    public function getGqlTypeName(): string
+    {
+        return static::gqlTypeNameByContext($this->getType());
+    }
+
     public static function gqlTypeNameByContext(mixed $context): string
     {
         /** @var ProductType $context */
@@ -653,15 +659,6 @@ class Product extends Purchasable
         };
     }
 
-    /**
-     * Generates the SKU from the product type's SKU format when none was given.
-     */
-    #[Override]
-    public function prepareForValidation(): void
-    {
-        $this->generateSku();
-    }
-
     #[Override]
     public function beforeSave(bool $isNew): bool
     {
@@ -669,7 +666,10 @@ class Product extends Purchasable
             $this->postDate = DateTime::createFromInterface(now());
         }
 
-        $this->generateSku();
+        // Saves that skip validation still get a SKU, once the slug the format may use is known.
+        if ($this->slug !== null && ! ElementHelper::isTempSlug($this->slug)) {
+            $this->generateSku();
+        }
 
         return parent::beforeSave($isNew);
     }
@@ -719,7 +719,10 @@ class Product extends Purchasable
         return parent::beforeDelete();
     }
 
-    private function generateSku(): void
+    /**
+     * Generates the SKU from the product type's SKU format when none was given.
+     */
+    public function generateSku(): void
     {
         if (($this->getSku() !== '' && ! PurchasableHelper::isTempSku($this->getSku())) || $this->typeId === null) {
             return;
