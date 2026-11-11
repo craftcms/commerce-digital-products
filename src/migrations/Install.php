@@ -64,8 +64,6 @@ class Install extends Migration
             'postDate' => $this->dateTime(),
             'expiryDate' => $this->dateTime(),
             'promotable' => $this->boolean()->notNull(),
-            'sku' => $this->string()->notNull(),
-            'price' => $this->decimal(14, 4)->notNull()->unsigned(),
             'dateCreated' => $this->dateTime()->notNull(),
             'dateUpdated' => $this->dateTime()->notNull(),
             'uid' => $this->uid(),
@@ -117,7 +115,6 @@ class Install extends Migration
         $this->createIndex(null, Table::LICENSES, 'orderId', false);
         $this->createIndex(null, Table::LICENSES, 'productId', false);
 
-        $this->createIndex(null, Table::PRODUCTS, 'sku', true);
         $this->createIndex(null, Table::PRODUCTS, 'typeId', false);
         $this->createIndex(null, Table::PRODUCTS, 'taxCategoryId', false);
 
