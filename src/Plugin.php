@@ -6,6 +6,8 @@ use Craft;
 use craft\base\Model;
 use craft\base\Plugin as BasePlugin;
 use craft\commerce\elements\Order;
+use craft\commerce\fieldlayoutelements\PurchasablePriceField;
+use craft\commerce\fieldlayoutelements\PurchasableSkuField;
 use craft\commerce\services\Payments as PaymentService;
 use craft\commerce\services\Purchasables;
 use craft\console\Controller as ConsoleController;
@@ -197,6 +199,8 @@ class Plugin extends BasePlugin
 
             if ($fieldLayout->type == Product::class) {
                 $e->fields[] = ProductTitleField::class;
+                $e->fields[] = PurchasableSkuField::class;
+                $e->fields[] = PurchasablePriceField::class;
             }
         });
     }

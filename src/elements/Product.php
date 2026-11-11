@@ -19,9 +19,12 @@ use craft\elements\User;
 use craft\helpers\ArrayHelper;
 use craft\helpers\Cp;
 use craft\helpers\DateTimeHelper;
+use craft\helpers\ElementHelper;
 use craft\helpers\Html;
+use craft\helpers\UrlHelper;
 use craft\models\FieldLayout;
 use craft\validators\DateTimeValidator;
+use craft\validators\SlugValidator;
 use DateTime;
 use yii\base\Exception;
 
@@ -95,6 +98,17 @@ class Product extends Purchasable
     public function __toString(): string
     {
         return (string)$this->title;
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public function init(): void
+    {
+        parent::init();
+
+        // This class's own `taxCategoryId` property hides Purchasable's default, so new products need it set here
+        $this->taxCategoryId ??= Commerce::getInstance()->getTaxCategories()->getDefaultTaxCategory()->id;
     }
 
     /**
@@ -301,6 +315,15 @@ class Product extends Purchasable
     {
         $rules = parent::defineRules();
 
+        // Generate the SKU right after the slug validator sets the final slug, which the SKU format may use,
+        // and before Purchasable's rules require a SKU
+        foreach ($rules as $i => $rule) {
+            if (($rule[1] ?? null) === SlugValidator::class) {
+                array_splice($rules, $i + 1, 0, [[['sku'], 'generateSku', 'skipOnEmpty' => false, 'on' => [self::SCENARIO_DEFAULT, self::SCENARIO_LIVE]]]);
+                break;
+            }
+        }
+
         $rules[] = [['typeId'], 'required'];
         $rules[] = [['sku'], 'string', 'max' => 255];
         $rules[] = [['postDate', 'expiryDate'], DateTimeValidator::class];
@@ -365,6 +388,16 @@ class Product extends Purchasable
         }
 
         return sprintf('digital-products/products/%s/%s', $productType->handle, $this->getCanonicalId());
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public function getPostEditUrl(): ?string
+    {
+        $productType = $this->getType();
+
+        return UrlHelper::cpUrl($productType ? 'digital-products/products/' . $productType->handle : 'digital-products/products');
     }
 
     /**
@@ -578,6 +611,23 @@ class Product extends Purchasable
     /**
      * @inheritdoc
      */
+    public function beforeSave(bool $isNew): bool
+    {
+        // Default the post date to now, as the old product edit screen did
+        if (
+            !$this->postDate &&
+            $this->enabled &&
+            in_array($this->scenario, [self::SCENARIO_LIVE, self::SCENARIO_DEFAULT], true)
+        ) {
+            $this->postDate = DateTimeHelper::now();
+        }
+
+        return parent::beforeSave($isNew);
+    }
+
+    /**
+     * @inheritdoc
+     */
     public function afterSave(bool $isNew): void
     {
         if (!$this->propagating) {
@@ -598,15 +648,8 @@ class Product extends Purchasable
             $productRecord->promotable = (bool)$this->promotable;
             $productRecord->taxCategoryId = $this->taxCategoryId;
 
-            // Generate SKU if empty
-            if (empty($this->getSku())) {
-                try {
-                    $productType = DigitalProducts::getInstance()->getProductTypes()->getProductTypeById($this->typeId);
-                    $this->setSku(Craft::$app->getView()->renderSandboxedObjectTemplate($productType->skuFormat, $this));
-                } catch (\Exception $e) {
-                    $this->setSku('');
-                }
-            }
+            // Saves that skip validation still get a SKU
+            $this->generateSku();
 
             $productRecord->dateUpdated = $this->dateUpdated;
             $productRecord->dateCreated = $this->dateCreated;
@@ -618,6 +661,25 @@ class Product extends Purchasable
         }
 
         parent::afterSave($isNew);
+    }
+
+    /**
+     * Generates the SKU from the product type's SKU format, if the product has no SKU yet.
+     *
+     * Products whose slug is still temporary, such as fresh drafts, are skipped, since the format may use the slug.
+     */
+    public function generateSku(): void
+    {
+        if (!empty($this->getSku()) || !$this->typeId || ElementHelper::isTempSlug((string)$this->slug)) {
+            return;
+        }
+
+        try {
+            $productType = DigitalProducts::getInstance()->getProductTypes()->getProductTypeById($this->typeId);
+            $this->setSku(Craft::$app->getView()->renderSandboxedObjectTemplate((string)$productType?->skuFormat, $this));
+        } catch (\Exception $e) {
+            $this->setSku('');
+        }
     }
 
     /**
