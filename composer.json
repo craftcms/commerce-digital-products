@@ -23,18 +23,6 @@
     "docs": "https://github.com/craftcms/commerce-digital-products",
     "rss": "https://github.com/craftcms/commerce-digital-products/commits/master.atom"
   },
-  "repositories": [
-    {
-      "type": "path",
-      "url": "../commerce-6x-base",
-      "options": {
-        "symlink": true,
-        "versions": {
-          "craftcms/commerce": "6.x-dev"
-        }
-      }
-    }
-  ],
   "require": {
     "php": "^8.5",
     "craftcms/cms": "6.x-dev",

@@ -4,6 +4,8 @@ This guide lists what changed in 6.0 and what you need to update in your project
 
 Digital products are becoming a first-party feature of Commerce 6. Commerce 6 ships a command that moves this plugin's data into Commerce's own tables; until you run it, Digital Products 6.0 keeps working on Craft 6 and Commerce 6.
 
+Commerce's digital products use the same GraphQL type and query names, `craft.digitalProducts` and `craft:resave:digital-products` as this plugin. While this plugin's tables have data, the plugin registers those names and Commerce hides its own digital products. Once `php artisan commerce:digital-products:migrate` has moved the data, Commerce registers them instead, so templates and GraphQL queries keep working before you uninstall the plugin.
+
 ## Requirements
 
 - Craft CMS 6.0 or later

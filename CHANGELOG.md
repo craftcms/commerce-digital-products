@@ -9,6 +9,7 @@
 - `ProductTypes::EVENT_BEFORE_SAVE_PRODUCTTYPE`, `ProductTypes::EVENT_AFTER_SAVE_PRODUCTTYPE` and `License::EVENT_GENERATE_LICENSE_KEY` were replaced by the `ProductTypeSaving`, `ProductTypeSaved` and `LicenseKeyGenerating` Laravel events.
 - The control panel screens are now native Craft 6 screens.
 - `resave/digital-products` is now `craft:resave:digital-products`.
+- When Commerce provides digital products itself and this plugin's data has been migrated into it, the plugin no longer registers its GraphQL types and queries, `craft.digitalProducts` or `craft:resave:digital-products`, which Commerce registers under the same names.
 - Sites upgrading from 4.x get the 5.x schema changes (SKUs and prices move into Commerce's purchasable tables) during the update.
 
 ## Unreleased
