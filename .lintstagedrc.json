@@ -1,6 +1,4 @@
 {
-  "**/*.php": [
-    "./vendor/bin/pint"
-  ],
+  "**/*.php": ["./vendor/bin/pint"],
   "*": "prettier --ignore-unknown --write"
 }
