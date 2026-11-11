@@ -8,6 +8,7 @@
 - Fixed an error that occurred when viewing digital products in "Display as cards" view. ([#111](https://github.com/craftcms/commerce-digital-products/issues/111))
 - Digital products and Licenses now use Craft's native element editor, with breadcrumb navigation, draft-based creation, and standard sidebar metadata.
 - Licenses can now be created manually from the control panel via a "New license" button.
+- Licenses now support custom fields, managed from Digital Products → Settings → Licenses. ([#30](https://github.com/craftcms/commerce-digital-products/issues/30))
 - `productId` and `ownerEmail` columns are now nullable, allowing licenses to be created without an initial product or owner email.
 - The Digital Products section of the control panel now opens the Products index instead of Licenses, when there are product types. ([#64](https://github.com/craftcms/commerce-digital-products/issues/64))
 
