@@ -4,13 +4,17 @@
 
 - Fixed a bug where the `product()` method on `LicenseQuery` didn't accept arrays or `not` conditions. ([#104](https://github.com/craftcms/commerce-digital-products/issues/104))
 - Added a `digital-products/download/download` action that streams a licensed asset to the browser without exposing the underlying file URL. ([#67](https://github.com/craftcms/commerce-digital-products/issues/67), [#109](https://github.com/craftcms/commerce-digital-products/issues/109))
-- Fixed a PHP error that could occur when paying for a completed order that contains deleted digital products.
-- Fixed an SQL error that could occur when saving a new digital product. ([#110](https://github.com/craftcms/commerce-digital-products/issues/110))
 - Fixed a bug where the Price field was not editable in the element index inline editor. ([#112](https://github.com/craftcms/commerce-digital-products/issues/112))
 - Fixed an error that occurred when viewing digital products in "Display as cards" view. ([#111](https://github.com/craftcms/commerce-digital-products/issues/111))
 - Digital products and Licenses now use Craft's native element editor, with breadcrumb navigation, draft-based creation, and standard sidebar metadata.
 - Licenses can now be created manually from the control panel via a "New license" button.
 - `productId` and `ownerEmail` columns are now nullable, allowing licenses to be created without an initial product or owner email.
+
+## 4.1.0 - 2026-07-08
+
+- Fixed a [high-severity](https://github.com/craftcms/cms/security/policy#severity--remediation) RCE vulnerability. ([GHSA-46mx-jh57-9v4h](https://github.com/craftcms/commerce-digital-products/security/advisories/GHSA-46mx-jh57-9v4h))
+- Fixed a PHP error that could occur when paying for a completed order that contains deleted digital products.
+- Fixed an SQL error that could occur when saving a new digital product. ([#110](https://github.com/craftcms/commerce-digital-products/issues/110))
 
 ## 4.0.3 - 2025-02-03
 
