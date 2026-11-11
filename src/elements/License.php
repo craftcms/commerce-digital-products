@@ -194,6 +194,14 @@ class License extends Element
     /**
      * @inheritdoc
      */
+    public function getPostEditUrl(): ?string
+    {
+        return UrlHelper::cpUrl('digital-products/licenses');
+    }
+
+    /**
+     * @inheritdoc
+     */
     protected function crumbs(): array
     {
         return [
