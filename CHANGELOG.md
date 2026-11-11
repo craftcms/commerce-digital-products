@@ -11,6 +11,7 @@
 - Digital products and Licenses now use Craft's native element editor, with breadcrumb navigation, draft-based creation, and standard sidebar metadata.
 - Licenses can now be created manually from the control panel via a "New license" button.
 - `productId` and `ownerEmail` columns are now nullable, allowing licenses to be created without an initial product or owner email.
+- The Digital Products section of the control panel now opens the Products index instead of Licenses, when there are product types. ([#64](https://github.com/craftcms/commerce-digital-products/issues/64))
 
 ## 4.0.3 - 2025-02-03
 
