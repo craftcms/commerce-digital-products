@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Fixed a bug where the `product()` method on `LicenseQuery` didn't accept arrays or `not` conditions. ([#104](https://github.com/craftcms/commerce-digital-products/issues/104))
+- Fixed a bug where the `product()` method on `LicenseQuery` returned all licenses when no products matched the given SKUs.
 - Added a `digital-products/download/download` action that streams a licensed asset to the browser without exposing the underlying file URL. ([#67](https://github.com/craftcms/commerce-digital-products/issues/67), [#109](https://github.com/craftcms/commerce-digital-products/issues/109))
 - Fixed a bug where the Price field was not editable in the element index inline editor. ([#112](https://github.com/craftcms/commerce-digital-products/issues/112))
 - Fixed an error that occurred when viewing digital products in "Display as cards" view. ([#111](https://github.com/craftcms/commerce-digital-products/issues/111))

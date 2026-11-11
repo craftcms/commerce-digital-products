@@ -3,7 +3,9 @@
 namespace craft\digitalproducts\elements\db;
 
 use craft\base\Element;
+use craft\commerce\db\Table as CommerceTable;
 use craft\db\Query;
+use craft\digitalproducts\db\Table;
 use craft\digitalproducts\elements\License;
 use craft\digitalproducts\elements\Product;
 use craft\digitalproducts\models\ProductType;
@@ -181,11 +183,13 @@ class LicenseQuery extends ElementQuery
         if ($value instanceof Product) {
             $this->productId = $value->id;
         } elseif ($value !== null) {
+            // SKUs live in Commerce's purchasables table. `[0]` makes a SKU that matches nothing return no licenses.
             $this->productId = (new Query())
-                ->select(['id'])
-                ->from(['{{%digitalproducts_products}}'])
-                ->where(Db::parseParam('sku', $value))
-                ->column();
+                ->select(['purchasables.id'])
+                ->from(['purchasables' => CommerceTable::PURCHASABLES])
+                ->innerJoin(['products' => Table::PRODUCTS], '[[products.id]] = [[purchasables.id]]')
+                ->where(Db::parseParam('purchasables.sku', $value))
+                ->column() ?: [0];
         } else {
             $this->productId = null;
         }
