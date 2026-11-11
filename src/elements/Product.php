@@ -602,7 +602,7 @@ class Product extends Purchasable
             if (empty($this->getSku())) {
                 try {
                     $productType = DigitalProducts::getInstance()->getProductTypes()->getProductTypeById($this->typeId);
-                    $this->setSku(Craft::$app->getView()->renderObjectTemplate($productType->skuFormat, $this));
+                    $this->setSku(Craft::$app->getView()->renderSandboxedObjectTemplate($productType->skuFormat, $this));
                 } catch (\Exception $e) {
                     $this->setSku('');
                 }
