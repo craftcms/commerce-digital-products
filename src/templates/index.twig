@@ -1,9 +1,9 @@
-{% if currentUser.can('digitalProducts-manageLicenses') %}
-  {% redirect 'digital-products/licenses' %}
+{% if currentUser.can('digitalProducts-manageProducts') and craft.digitalProducts.productTypes|length %}
+  {% redirect 'digital-products/products' %}
 {% endif %}
 
-{% if currentUser.can('digitalProducts-manageProducts') %}
-  {% redirect 'digital-products/products' %}
+{% if currentUser.can('digitalProducts-manageLicenses') %}
+  {% redirect 'digital-products/licenses' %}
 {% endif %}
 
 {% extends "403" %}
