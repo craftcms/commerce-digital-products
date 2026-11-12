@@ -344,14 +344,19 @@ Both licenses and products have several eager-loadable properties.
 
 ## Serving licensed file downloads
 
-To let customers download a file after purchasing a digital product, add an Assets field to your product type and attach the downloadable file to each product. Then use the `digital-products/download/download` action to stream the file to the browser — the underlying asset URL is never exposed.
+To let customers download a file after purchasing a digital product, add an Assets field to your product type and attach the downloadable file to each product. Then use the `digital-products/download/download` action to stream the file to the browser. The underlying asset URL is never exposed.
 
-The action accepts two required parameters:
+The action accepts these parameters:
 
-- `licenseKey` — the customer's license key
-- `assetId` — the ID of the asset to download
+- `licenseKey` (required): the customer's license key
+- `assetId`: the ID of the asset to download
 
-The asset must be related to the product associated with the license. If either the license key is invalid or the asset is not related to that product, a 404 is returned.
+Which assets a license can download depends on the product type's **Download Field** setting:
+
+- **A field is selected:** only assets in that field on the licensed product can be downloaded. `assetId` is optional and defaults to the field's first asset.
+- **Any related asset (the default):** any asset related to the licensed product can be downloaded, and `assetId` is required.
+
+A 404 is returned if the license key is invalid or the asset isn't downloadable with it.
 
 ### Example
 
