@@ -2,10 +2,12 @@
 
 namespace craft\digitalproducts\models;
 
+use Craft;
 use craft\base\Model;
 use craft\behaviors\FieldLayoutBehavior;
 use craft\digitalproducts\elements\Product;
 use craft\digitalproducts\Plugin as DigitalProducts;
+use craft\fields\Assets;
 use craft\helpers\ArrayHelper;
 use craft\helpers\UrlHelper;
 use craft\models\FieldLayout;
@@ -49,6 +51,12 @@ class ProductType extends Model
      * @var string SKU format
      */
     public $skuFormat;
+
+    /**
+     * @var string|null The UID of the Assets field whose assets licenses can download.
+     * When null, licenses can download any asset related to the product.
+     */
+    public ?string $downloadFieldUid = null;
 
     /**
      * @var string|null UID
@@ -108,6 +116,35 @@ class ProductType extends Model
         foreach ($this->_siteSettings as $settings) {
             $settings->setProductType($this);
         }
+    }
+
+    /**
+     * Returns the Assets field whose assets licenses can download, if one is set and still in the field layout.
+     */
+    public function getDownloadField(): ?Assets
+    {
+        if (!$this->downloadFieldUid) {
+            return null;
+        }
+
+        $field = $this->getFieldLayout()->getFieldByUid($this->downloadFieldUid);
+
+        return $field instanceof Assets ? $field : null;
+    }
+
+    /**
+     * @inheritdoc
+     */
+    protected function defineRules(): array
+    {
+        $rules = parent::defineRules();
+        $rules[] = [['downloadFieldUid'], function(string $attribute) {
+            if (!$this->getDownloadField()) {
+                $this->addError($attribute, Craft::t('digital-products', 'The download field must be an Assets field in the product type’s field layout.'));
+            }
+        }, 'skipOnEmpty' => true];
+
+        return $rules;
     }
 
     /**

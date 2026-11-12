@@ -67,6 +67,7 @@ class ProjectConfigData
                 'name',
                 'handle',
                 'skuFormat',
+                'downloadField' => 'downloadFieldUid',
                 'uid',
             ])
             ->from(['{{%digitalproducts_producttypes}} productTypes'])
