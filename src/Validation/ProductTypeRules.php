@@ -33,6 +33,7 @@ class ProductTypeRules extends Ruleset
                     : $query),
             ],
             'skuFormat' => ['nullable', 'string', 'max:255'],
+            'downloadFieldUid' => ['nullable', 'string', 'size:36'],
         ];
     }
 }

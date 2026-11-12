@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace CraftCms\DigitalProducts\Http\Controllers\Settings;
 
 use CraftCms\Cms\Cp\SelectOptions;
+use CraftCms\Cms\Field\Assets;
 use CraftCms\Cms\Http\Responses\CpScreenResponse;
 use CraftCms\Cms\Support\Facades\Fields;
 use CraftCms\Cms\Support\Facades\Sites;
 use CraftCms\Cms\Support\Html;
+use CraftCms\Cms\Ui\Controls\Choice;
 use CraftCms\Cms\Ui\Controls\FieldLayoutDesigner;
 use CraftCms\Cms\Ui\Controls\Handle;
 use CraftCms\Cms\Ui\Controls\Table as TableControl;
@@ -88,7 +90,7 @@ class ProductTypesController extends BaseSettingsController
         $values = $this->initialValues($productType, $brandNew);
 
         $ui = $this->uiResolver->resolve(
-            $this->buildUi($brandNew),
+            $this->buildUi($productType, $brandNew),
             new UiContext(
                 values: $values,
                 mode: $this->readOnly ? ControlMode::ReadOnly : ControlMode::Editable,
@@ -133,6 +135,7 @@ class ProductTypesController extends BaseSettingsController
             'name' => $productType->name,
             'handle' => $productType->handle,
             'skuFormat' => $productType->skuFormat ?? '',
+            'downloadFieldUid' => $productType->downloadFieldUid ?? '',
             'sites' => $siteRows,
             'fieldLayout' => [
                 'id' => $fieldLayout->id,
@@ -142,7 +145,7 @@ class ProductTypesController extends BaseSettingsController
         ];
     }
 
-    private function buildUi(bool $brandNew): Ui
+    private function buildUi(ProductType $productType, bool $brandNew): Ui
     {
         $handle = Handle::make('handle');
 
@@ -182,6 +185,14 @@ class ProductTypesController extends BaseSettingsController
                         'ex1' => Html::code('{slug}'),
                         'ex2' => Html::code('{myCustomField}'),
                     ], 'digital-products')),
+                Field::make(t('Download Field', category: 'digital-products'), Choice::make('downloadFieldUid')->withoutPlaceholder()->options([
+                    ['label' => t('Any related asset', category: 'digital-products'), 'value' => ''],
+                    ...array_values(array_map(fn (Assets $field) => ['label' => t($field->name, category: 'site'), 'value' => $field->uid], array_filter(
+                        $productType->getCustomFields(),
+                        fn ($field) => $field instanceof Assets,
+                    ))),
+                ]))
+                    ->instructions(t('Which Assets field holds the files that licenses can download with the `digital-products/download/download` action. Add the field to the product field layout and save the product type first for it to appear here.', category: 'digital-products')),
                 Separator::make('site-settings-separator'),
                 Heading::make('site-settings-heading', t('Site Settings'))
                     ->description(t('Choose which sites this product type should be available in, and configure the site-specific settings.', category: 'digital-products')),
@@ -210,6 +221,7 @@ class ProductTypesController extends BaseSettingsController
         $productType->name = $request->input('name');
         $productType->handle = $request->input('handle');
         $productType->skuFormat = $request->input('skuFormat') ?: null;
+        $productType->downloadFieldUid = $request->input('downloadFieldUid') ?: null;
 
         $allSiteSettings = [];
 

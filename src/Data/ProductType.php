@@ -6,6 +6,7 @@ namespace CraftCms\DigitalProducts\Data;
 
 use CraftCms\Cms\Component\Component;
 use CraftCms\Cms\Database\Table as CraftTable;
+use CraftCms\Cms\Field\Assets;
 use CraftCms\Cms\Field\Contracts\FieldInterface;
 use CraftCms\Cms\FieldLayout\Contracts\FieldLayoutProviderInterface;
 use CraftCms\Cms\FieldLayout\FieldLayout;
@@ -38,6 +39,12 @@ class ProductType extends Component implements FieldLayoutProviderInterface
     public ?string $handle = null;
 
     public ?string $skuFormat = null;
+
+    /**
+     * The UID of the Assets field whose assets licenses can download. When null, licenses can download any asset
+     * related to the product.
+     */
+    public ?string $downloadFieldUid = null;
 
     public ?string $uid = null;
 
@@ -139,6 +146,20 @@ class ProductType extends Component implements FieldLayoutProviderInterface
         return $this->getFieldLayout()->getCustomFields();
     }
 
+    /**
+     * Returns the Assets field whose assets licenses can download, if one is set and still in the field layout.
+     */
+    public function getDownloadField(): ?Assets
+    {
+        if (! $this->downloadFieldUid) {
+            return null;
+        }
+
+        $field = $this->getFieldLayout()->getFieldByUid($this->downloadFieldUid);
+
+        return $field instanceof Assets ? $field : null;
+    }
+
     #[\Override]
     public function afterValidate(?Validator $validator = null): void
     {
@@ -163,6 +184,10 @@ class ProductType extends Component implements FieldLayoutProviderInterface
             }
         }
 
+        if ($this->downloadFieldUid && ! $this->getDownloadField()) {
+            $this->errors()->add('downloadFieldUid', t('The download field must be an Assets field in the product type’s field layout.', category: 'digital-products'));
+        }
+
         if (empty($this->getSiteSettings())) {
             $this->errors()->add('siteSettings', t('At least one site must be enabled for the product type.', category: 'digital-products'));
         }
@@ -179,6 +204,7 @@ class ProductType extends Component implements FieldLayoutProviderInterface
             'name' => $this->name,
             'handle' => $this->handle,
             'skuFormat' => $this->skuFormat,
+            'downloadField' => $this->downloadFieldUid,
             'siteSettings' => [],
         ];
 

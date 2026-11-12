@@ -209,6 +209,7 @@ class ProductTypes
             $record->name = $data['name'];
             $record->handle = $data['handle'];
             $record->skuFormat = $data['skuFormat'] ?? null;
+            $record->downloadFieldUid = $data['downloadField'] ?? null;
 
             if (! empty($data['fieldLayouts']) && ! empty($config = reset($data['fieldLayouts']))) {
                 $layout = FieldLayout::createFromConfig($config);
@@ -417,6 +418,7 @@ class ProductTypes
             'name' => $record->name,
             'handle' => $record->handle,
             'skuFormat' => $record->skuFormat,
+            'downloadFieldUid' => $record->downloadFieldUid,
             'uid' => $record->uid,
         ]);
     }

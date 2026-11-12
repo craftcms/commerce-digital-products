@@ -16,6 +16,7 @@ use CraftCms\DigitalProducts\Database\Table;
  * @property string $name
  * @property string $handle
  * @property string|null $skuFormat
+ * @property string|null $downloadFieldUid
  * @property string $uid
  */
 class ProductType extends BaseModel

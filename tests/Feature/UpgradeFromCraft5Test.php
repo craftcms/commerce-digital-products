@@ -118,3 +118,14 @@ it('rewrites the stored Craft 5 class names', function () {
     expect(Product::find()->id($product->id)->one())->toBeInstanceOf(Product::class)
         ->and(License::find()->id($license->id)->one())->toBeInstanceOf(License::class);
 });
+
+it('adds the download field column for sites upgrading from before 5.1', function () {
+    Schema::table(Table::PRODUCT_TYPES, fn (Blueprint $table) => $table->dropColumn('downloadFieldUid'));
+
+    $migration = require dirname(__DIR__, 2).'/database/migrations/2026_11_12_000000_add_product_type_download_field.php';
+    $migration->up();
+    // Running it again on a 5.1 site, which already has the column, is a no-op
+    $migration->up();
+
+    expect(Schema::hasColumn(Table::PRODUCT_TYPES, 'downloadFieldUid'))->toBeTrue();
+});

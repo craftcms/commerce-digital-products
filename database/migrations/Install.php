@@ -28,6 +28,7 @@ class Install extends Migration
             $table->string('name');
             $table->string('handle');
             $table->string('skuFormat')->nullable();
+            $table->char('downloadFieldUid', 36)->nullable();
             $table->dateTime('dateCreated');
             $table->dateTime('dateUpdated');
             $table->char('uid', 36)->default('0');

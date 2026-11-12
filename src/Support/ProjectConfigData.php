@@ -43,6 +43,7 @@ class ProjectConfigData
                 'name' => $row->name,
                 'handle' => $row->handle,
                 'skuFormat' => $row->skuFormat,
+                'downloadField' => $row->downloadFieldUid,
                 'siteSettings' => [],
             ];
 

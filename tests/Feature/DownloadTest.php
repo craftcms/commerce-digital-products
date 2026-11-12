@@ -46,6 +46,8 @@ beforeEach(function () {
 
     $field = new AssetsField(['name' => 'Files', 'handle' => 'files']);
     Fields::saveField($field) or throw new RuntimeException(json_encode($field->errors()->getMessages()));
+    $coverField = new AssetsField(['name' => 'Cover', 'handle' => 'cover']);
+    Fields::saveField($coverField) or throw new RuntimeException(json_encode($coverField->errors()->getMessages()));
 
     $productType = createProductType();
     $productType->setFieldLayout(FieldLayout::createFromConfig([
@@ -55,6 +57,7 @@ beforeEach(function () {
             'elements' => [
                 ['type' => ProductTitleField::class],
                 ['type' => CustomField::class, 'fieldUid' => $field->uid],
+                ['type' => CustomField::class, 'fieldUid' => $coverField->uid],
             ],
         ]],
     ]));
@@ -63,8 +66,14 @@ beforeEach(function () {
     $this->file = createAsset('manual.txt', 'Digital product contents');
     $this->otherFile = createAsset('other.txt', 'Not for sale');
 
+    $this->productType = $productType;
+    $this->field = $field;
+    $this->coverField = $coverField;
+    $this->cover = createAsset('cover.txt', 'Cover image');
+
     $product = Product::find()->id(createProduct($productType)->id)->one();
     $product->setFieldValue('files', [$this->file->id]);
+    $product->setFieldValue('cover', [$this->cover->id]);
     Elements::saveElement($product) or throw new RuntimeException(json_encode($product->errors()->getMessages()));
 
     $this->license = new License;
@@ -104,4 +113,59 @@ it('returns 404 for an asset that is not related to the product', function () {
         'licenseKey' => $this->license->licenseKey,
         'assetId' => $this->otherFile->id,
     ]))->assertNotFound();
+});
+
+function download(array $params)
+{
+    return test()->get('/actions/digital-products/download/download?'.http_build_query($params));
+}
+
+it('serves any related asset and requires assetId when the product type has no download field', function () {
+    download(['licenseKey' => $this->license->licenseKey, 'assetId' => $this->cover->id])->assertOk()->assertDownload('cover.txt');
+    download(['licenseKey' => $this->license->licenseKey])->assertStatus(400);
+});
+
+it('only serves assets in the download field, defaulting to its first asset', function () {
+    $this->productType->downloadFieldUid = $this->field->uid;
+    app(ProductTypes::class)->saveProductType($this->productType) or throw new RuntimeException(json_encode($this->productType->errors()->getMessages()));
+    app(ProductTypes::class)->reset();
+
+    $response = download(['licenseKey' => $this->license->licenseKey]);
+    $response->assertOk()->assertDownload('manual.txt');
+    expect($response->streamedContent())->toBe('Digital product contents');
+
+    download(['licenseKey' => $this->license->licenseKey, 'assetId' => $this->file->id])->assertOk();
+    download(['licenseKey' => $this->license->licenseKey, 'assetId' => $this->cover->id])->assertNotFound();
+});
+
+it('returns 404 when the download field was removed from the field layout', function () {
+    $this->productType->downloadFieldUid = $this->field->uid;
+    app(ProductTypes::class)->saveProductType($this->productType) or throw new RuntimeException('save failed');
+
+    $this->productType->setFieldLayout(FieldLayout::createFromConfig([
+        'type' => Product::class,
+        'tabs' => [['name' => 'Content', 'elements' => [
+            ['type' => ProductTitleField::class],
+            ['type' => CustomField::class, 'fieldUid' => $this->coverField->uid],
+        ]]],
+    ]));
+    // Skip validation to simulate the field leaving the layout after the setting was saved
+    app(ProductTypes::class)->saveProductType($this->productType, false) or throw new RuntimeException('save failed');
+    app(ProductTypes::class)->reset();
+
+    download(['licenseKey' => $this->license->licenseKey, 'assetId' => $this->file->id])->assertNotFound();
+    download(['licenseKey' => $this->license->licenseKey, 'assetId' => $this->cover->id])->assertNotFound();
+});
+
+it('only accepts an Assets field from the field layout as the download field', function () {
+    $this->productType->downloadFieldUid = $this->field->uid;
+    expect($this->productType->validate())->toBeTrue()
+        ->and($this->productType->getDownloadField()?->handle)->toBe('files');
+
+    $outside = new AssetsField(['name' => 'Elsewhere', 'handle' => 'elsewhere']);
+    Fields::saveField($outside);
+    $this->productType->downloadFieldUid = $outside->uid;
+
+    expect($this->productType->validate())->toBeFalse()
+        ->and($this->productType->errors()->has('downloadFieldUid'))->toBeTrue();
 });

@@ -24,6 +24,7 @@
 ### Database
 
 - Added the `2026_11_10_000000_upgrade_from_craft_5` migration, which applies the 5.x schema changes to sites coming from 4.x and rewrites stored `craft\digitalproducts\…` class names in the database and project config.
+- Added the `2026_11_12_000000_add_product_type_download_field` migration, which adds the Download Field setting's column for sites upgrading from before Digital Products 5.1.
 - Removed the `m220914_100809_fix_soft_deleted`, `m240620_150738_content_refactor_elements`, `m260526_000000_drop_sku_price_columns` and `m260526_000001_nullable_license_product` migrations, which the new migration replaces.
 
 ### Extensibility
