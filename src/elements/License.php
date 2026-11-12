@@ -96,6 +96,10 @@ class License extends Element
      */
     public function __toString(): string
     {
+        if (!$this->getProduct()) {
+            return Craft::t('digital-products', 'New license');
+        }
+
         return Craft::t('digital-products', 'License for “{product}”', ['product' => $this->getProductName()]);
     }
 
@@ -138,7 +142,13 @@ class License extends Element
      */
     public function getProduct(): ?Product
     {
-        if ($this->_product === null) {
+        // `id(null)` doesn't filter the query, so a license without a product would get an arbitrary one
+        if (!$this->productId) {
+            return null;
+        }
+
+        // Refetch when the product was changed after it was first loaded, such as in the license editor
+        if ($this->_product === null || $this->_product->id !== $this->productId) {
             /** @var Product|null $_product */
             $_product = Product::find()
                 ->id($this->productId)
