@@ -1,10 +1,13 @@
 # Release Notes for Digital Products
 
-## Unreleased
+## 5.1.0 - 2026-11-12
 
-- Added a Download Field setting to digital product types, which limits the `digital-products/download/download` action to assets in that field. When no field is selected, licenses can still download any asset related to their product.
-- Fixed an error that occurred when viewing the Product Types settings pages when Dev Mode was enabled.
-- Fixed a bug where licenses without a product showed another product's name, including in the license editor and save notices.
+- Added a Download Field setting to digital product types, which limits the `digital-products/download/download` action to assets in that field. When no field is selected, licenses can still download any asset related to their product. ([#121](https://github.com/craftcms/commerce-digital-products/pull/121))
+- Added `craft\digitalproducts\models\ProductType::$downloadFieldUid`.
+- Added `craft\digitalproducts\models\ProductType::getDownloadField()`.
+- The `assetId` param for the `digital-products/download/download` action is now optional when the product type has a download field, and defaults to the field's first asset.
+- Fixed an error that occurred when viewing the Product Types settings pages when Dev Mode was enabled. ([#120](https://github.com/craftcms/commerce-digital-products/pull/120))
+- Fixed a bug where licenses without a product showed another product's name, including in the license editor and save notices. ([#120](https://github.com/craftcms/commerce-digital-products/pull/120))
 
 ## 5.0.0 - 2026-11-12
 
