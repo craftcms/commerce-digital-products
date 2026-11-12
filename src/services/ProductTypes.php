@@ -268,6 +268,7 @@ class ProductTypes extends Component
             'name' => $productType->name,
             'handle' => $productType->handle,
             'skuFormat' => $productType->skuFormat,
+            'downloadField' => $productType->downloadFieldUid,
             'siteSettings' => [],
         ];
 
@@ -349,6 +350,7 @@ class ProductTypes extends Component
             $productTypeRecord->name = $data['name'];
             $productTypeRecord->handle = $data['handle'];
             $productTypeRecord->skuFormat = $data['skuFormat'];
+            $productTypeRecord->downloadFieldUid = $data['downloadField'] ?? null;
 
             if (!empty($data['fieldLayouts'])) {
                 $fields = Craft::$app->getFields();
@@ -678,7 +680,7 @@ class ProductTypes extends Component
      */
     private function _createProductTypeQuery(): Query
     {
-        return (new Query())
+        $query = (new Query())
             ->select([
                 'id',
                 'fieldLayoutId',
@@ -688,6 +690,14 @@ class ProductTypes extends Component
                 'uid',
             ])
             ->from(['{{%digitalproducts_producttypes}}']);
+
+        // The column doesn't exist until the 4.0.0.5 migration has run
+        $schemaVersion = Craft::$app->getProjectConfig()->get('plugins.digital-products.schemaVersion', true);
+        if ($schemaVersion && version_compare($schemaVersion, '4.0.0.5', '>=')) {
+            $query->addSelect(['downloadFieldUid']);
+        }
+
+        return $query;
     }
 
     /**

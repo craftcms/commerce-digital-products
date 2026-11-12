@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Added a Download Field setting to digital product types, which limits the `digital-products/download/download` action to assets in that field. When no field is selected, licenses can still download any asset related to their product.
 - Fixed an error that occurred when viewing the Product Types settings pages when Dev Mode was enabled.
 - Fixed a bug where licenses without a product showed another product's name, including in the license editor and save notices.
 

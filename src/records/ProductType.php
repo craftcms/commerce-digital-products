@@ -14,6 +14,7 @@ use yii\db\ActiveQueryInterface;
  * @property string $name          Product type name
  * @property string $handle        Product type handle
  * @property string $skuFormat     SKU format
+ * @property string|null $downloadFieldUid Download field UID
  * @property FieldLayout $fieldLayout   Field layout
  *
  * @author    Pixel & Tonic, Inc. <support@pixelandtonic.com>

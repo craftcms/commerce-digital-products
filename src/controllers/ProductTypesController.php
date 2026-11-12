@@ -82,6 +82,7 @@ class ProductTypesController extends BaseController
         $productType->name = $request->getBodyParam('name');
         $productType->handle = $request->getBodyParam('handle');
         $productType->skuFormat = $request->getBodyParam('skuFormat');
+        $productType->downloadFieldUid = $request->getBodyParam('downloadFieldUid') ?: null;
 
         // Site-specific settings
         $allSiteSettings = [];

@@ -49,6 +49,23 @@
     errors: productType.getErrors('skuFormat')
   }) }}
 
+  {% set downloadFieldOptions = [{ label: 'Any related asset'|t('digital-products'), value: '' }] %}
+  {% for field in productType.getFieldLayout().getCustomFields() %}
+    {% if field is instance of('craft\\fields\\Assets') %}
+      {% set downloadFieldOptions = downloadFieldOptions|merge([{ label: field.name|t('site'), value: field.uid }]) %}
+    {% endif %}
+  {% endfor %}
+
+  {{ forms.selectField({
+    label: "Download Field"|t('digital-products'),
+    instructions: "Which Assets field holds the files that licenses can download with the `digital-products/download/download` action. Add the field to the field layout and save the product type first for it to appear here."|t('digital-products'),
+    id: 'downloadFieldUid',
+    name: 'downloadFieldUid',
+    options: downloadFieldOptions,
+    value: productType.downloadFieldUid,
+    errors: productType.getErrors('downloadFieldUid')
+  }) }}
+
   <hr>
 
   {% set siteRows = [] %}
