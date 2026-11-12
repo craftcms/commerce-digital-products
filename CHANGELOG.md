@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Fixed an error that occurred when viewing the Product Types settings pages when Dev Mode was enabled.
+- Fixed a bug where licenses without a product showed another product's name, including in the license editor and save notices.
 
 ## 5.0.0 - 2026-11-12
 
