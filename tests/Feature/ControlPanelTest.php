@@ -55,8 +55,16 @@ it('renders the control panel pages for an admin', function (string $uri) {
     'edit product type' => 'digital-products/producttypes/{typeId}',
 ]);
 
-it('redirects the section root to licenses', function () {
+it('redirects the section root to products, or to licenses when there are no product types', function () {
     actingAsAdmin();
+
+    $this->get('/admin/digital-products')->assertRedirectContains('digital-products/licenses');
+
+    createProductType();
+
+    $this->get('/admin/digital-products')->assertRedirectContains('digital-products/products');
+
+    actingAsUserWith(['accessCp', 'digitalProducts-manageLicenses']);
 
     $this->get('/admin/digital-products')->assertRedirectContains('digital-products/licenses');
 });

@@ -12,6 +12,7 @@ use CraftCms\DigitalProducts\Http\Controllers\ProductsController;
 use CraftCms\DigitalProducts\Http\Controllers\Settings\GeneralSettingsController;
 use CraftCms\DigitalProducts\Http\Controllers\Settings\LicenseFieldsController;
 use CraftCms\DigitalProducts\Http\Controllers\Settings\ProductTypesController;
+use CraftCms\DigitalProducts\ProductTypes;
 use Illuminate\Support\Facades\Route;
 
 use function CraftCms\Cms\cp_url;
@@ -20,7 +21,9 @@ use function CraftCms\Cms\currentUser;
 Route::get('digital-products', function () {
     $user = currentUser();
 
+    // Products comes first in the subnav, which only lists it when the user can edit a product type
     return match (true) {
+        $user?->can('digitalProducts-manageProducts') && app(ProductTypes::class)->getEditableProductTypes() !== [] => redirect()->to(cp_url('digital-products/products')),
         (bool) $user?->can('digitalProducts-manageLicenses') => redirect()->to(cp_url('digital-products/licenses')),
         (bool) $user?->can('digitalProducts-manageProducts') => redirect()->to(cp_url('digital-products/products')),
         default => abort(403),

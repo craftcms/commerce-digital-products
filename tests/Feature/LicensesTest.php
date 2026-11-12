@@ -133,17 +133,23 @@ it('eager loads product, order and owner on licenses, and existing licenses on p
 });
 
 it('creates a license in the control panel flow without a product, then generates its key', function () {
+    $productType = createProductType();
+    createProduct($productType, ['title' => 'Other product']);
+
     $license = new License;
     $license->ruleset->useScenario(ElementRules::SCENARIO_ESSENTIALS);
 
     expect(Elements::saveElement($license))->toBeTrue()
-        ->and($license->hasLicenseKey())->toBeFalse();
+        ->and($license->hasLicenseKey())->toBeFalse()
+        ->and($license->getProduct())->toBeNull()
+        ->and((string) $license)->toBe('New license');
 
     $license->ruleset->useScenario(ElementRules::SCENARIO_DEFAULT);
-    $license->productId = createProduct(createProductType())->id;
+    $license->productId = createProduct($productType, ['title' => 'Chosen product'])->id;
     $license->ownerEmail = 'manual@example.test';
 
     expect(Elements::saveElement($license))->toBeTrue()
+        ->and((string) $license)->toBe('License for “Chosen product”')
         ->and($license->hasLicenseKey())->toBeTrue()
         ->and(strlen($license->licenseKey))->toBe(app(Settings::class)->licenseKeyLength);
 });

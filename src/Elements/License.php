@@ -248,6 +248,10 @@ class License extends Element
     #[Override]
     public function __toString(): string
     {
+        if (! $this->getProduct()) {
+            return t('New license', category: 'digital-products');
+        }
+
         return t('License for “{product}”', ['product' => $this->getProductName()], category: 'digital-products');
     }
 
@@ -283,7 +287,12 @@ class License extends Element
 
     public function getProduct(): ?Product
     {
-        if ($this->product === null && $this->productId) {
+        if (! $this->productId) {
+            return null;
+        }
+
+        // Refetch when the product changed after it was first loaded, such as in the license editor
+        if ($this->product === null || $this->product->id !== $this->productId) {
             $this->product = Product::find()->id($this->productId)->status(null)->one();
         }
 
