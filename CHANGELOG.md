@@ -1,5 +1,9 @@
 # Release Notes for Digital Products
 
+## Unreleased
+
+- Fixed an error that occurred when viewing the Product Types settings pages when Dev Mode was enabled.
+
 ## 5.0.0 - 2026-11-12
 
 > [!WARNING]
