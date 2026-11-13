@@ -68,7 +68,10 @@
   "scripts": {
     "check-cs": "pint --test",
     "fix-cs": "pint",
-    "phpstan": "phpstan --memory-limit=1G",
+    "phpstan": [
+      "@prepare",
+      "phpstan --memory-limit=1G"
+    ],
     "test": "@php vendor/bin/pest",
     "clear": "@php vendor/bin/testbench package:purge-skeleton --ansi",
     "prepare": "@php vendor/bin/testbench package:discover --ansi",
