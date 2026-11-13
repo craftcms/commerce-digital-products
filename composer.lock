@@ -651,12 +651,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/craftcms/commerce.git",
-                "reference": "a0137590da6b266e1c84bfc5ed6a17b394cdc0e9"
+                "reference": "89ca61ec473a567c2e8b1ef8e33ad35707091a94"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/craftcms/commerce/zipball/a0137590da6b266e1c84bfc5ed6a17b394cdc0e9",
-                "reference": "a0137590da6b266e1c84bfc5ed6a17b394cdc0e9",
+                "url": "https://api.github.com/repos/craftcms/commerce/zipball/89ca61ec473a567c2e8b1ef8e33ad35707091a94",
+                "reference": "89ca61ec473a567c2e8b1ef8e33ad35707091a94",
                 "shasum": ""
             },
             "require": {

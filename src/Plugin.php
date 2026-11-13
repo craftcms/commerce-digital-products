@@ -26,7 +26,6 @@ use CraftCms\Cms\Ui\Ui;
 use CraftCms\Cms\Ui\UiContext;
 use CraftCms\Cms\User\Data\Permission;
 use CraftCms\Cms\User\Events\UserActivated;
-use CraftCms\Commerce\DigitalProduct\DigitalProducts as CommerceDigitalProducts;
 use CraftCms\Commerce\Order\Events\OrderCompleted;
 use CraftCms\Commerce\Order\Events\OrderPaid;
 use CraftCms\Commerce\Payment\Events\PaymentProcessing;
@@ -35,6 +34,7 @@ use CraftCms\Commerce\Purchasable\FieldLayoutElements\PurchasablePriceField;
 use CraftCms\Commerce\Purchasable\FieldLayoutElements\PurchasablePromotableField;
 use CraftCms\Commerce\Purchasable\FieldLayoutElements\PurchasableSkuField;
 use CraftCms\Commerce\Purchasable\PurchasableTypes;
+use CraftCms\DigitalProducts\Console\Commands\MigrateToCommerceCommand;
 use CraftCms\DigitalProducts\Console\Commands\ResaveDigitalProductsCommand;
 use CraftCms\DigitalProducts\Data\ProductType;
 use CraftCms\DigitalProducts\Elements\License;
@@ -115,28 +115,14 @@ class Plugin extends BasePlugin
         Gate::policy(Product::class, ProductPolicy::class);
         Gate::policy(License::class, LicensePolicy::class);
 
-        $this->registerSharedNames();
+        app(GqlTypes::class)->register(GqlProductInterface::class);
+        app(GqlQueries::class)->register(GqlProductQuery::class);
+        CraftVariable::macro('digitalProducts', fn () => app(DigitalProductsVariable::class));
+        $this->commands([ResaveDigitalProductsCommand::class, MigrateToCommerceCommand::class]);
 
         if ($this->isInstalled) {
             $this->registerProjectConfigListeners();
         }
-    }
-
-    /**
-     * Registers the GraphQL types and queries, `craft.digitalProducts` and `craft:resave:digital-products`,
-     * unless Commerce provides digital products itself and this plugin’s data has been migrated into it.
-     * Commerce uses the same names, and registers them only once there’s nothing left to migrate.
-     */
-    private function registerSharedNames(): void
-    {
-        if (class_exists(CommerceDigitalProducts::class) && app(CommerceDigitalProducts::class)->isEnabled()) {
-            return;
-        }
-
-        app(GqlTypes::class)->register(GqlProductInterface::class);
-        app(GqlQueries::class)->register(GqlProductQuery::class);
-        CraftVariable::macro('digitalProducts', fn () => app(DigitalProductsVariable::class));
-        $this->commands([ResaveDigitalProductsCommand::class]);
     }
 
     #[Override]

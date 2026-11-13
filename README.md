@@ -55,16 +55,6 @@ It replaces the 4.x/5.x migrations `m220914_100809_fix_soft_deleted`, `m240620_1
 
 These stay the same: the `digitalproducts_*` tables and their columns, element IDs, the `digital-products.productTypes.{uid}` and `digital-products.licenseFieldLayouts` project config keys, permission names, setting names and the `digital-products` plugin handle.
 
-### Moving to Commerce's digital products
-
-Digital products are becoming a first-party feature of Commerce 6, in separate `commerce_digitalproducts`, `commerce_digitalproducttypes`, `commerce_digitalproducttypes_sites` and `commerce_licenses` tables. Digital Products 6 keeps working until you move its data into Commerce with:
-
-```bash
-php artisan commerce:digital-products:migrate
-```
-
-Commerce's digital products use the same GraphQL type and query names, `craft.digitalProducts` and `craft:resave:digital-products`. While this plugin's tables have data, the plugin registers those names and Commerce hides its own digital products. Once the migrate command has moved the data, Commerce registers them instead, so templates and GraphQL queries keep working. Then uninstall the plugin.
-
 ### Classes
 
 The namespace changed from `craft\digitalproducts` to `CraftCms\DigitalProducts`. Update your `use` statements:
@@ -202,13 +192,93 @@ Nothing changes: the `digitalProducts` and `digitalProduct` queries, the `Digita
 
 `craft resave/digital-products` is now `php artisan craft:resave:digital-products` (alias `craft:resave/digital-products`). It takes `--type` and Craft's standard resave options.
 
+`php artisan digital-products:migrate-to-commerce` moves everything into Commerce. See [Moving to Commerce licenses](#moving-to-commerce-licenses).
+
 ### Permissions
 
 The permissions are unchanged: `digitalProducts-manageProducts` with a nested `digitalProducts-manageProductType:{uid}` per product type, `digitalProducts-manageLicenses` and `digitalProducts-manageProductTypes`. The settings screens and actions still require an admin.
 
 ### Uninstalling
 
-Uninstalling drops the plugin's four tables and removes its `digital-products` project config. It never deletes elements, and it works when the tables are already empty, as Commerce's migrate command leaves them.
+Uninstalling drops the plugin's four tables and removes its `digital-products` project config. It never deletes elements, and it works when the tables are already empty, as `digital-products:migrate-to-commerce` leaves them.
+
+## Moving to Commerce licenses
+
+Commerce 6 issues licenses itself. Instead of separate digital products, any product type can allow its variants to issue licenses, and each variant has an **Issues License** switch. Commerce keeps its license features hidden while this plugin's tables have data, so both can be installed while you move over.
+
+### Running the migration
+
+Back up your database, then run this where admin changes are allowed, such as your development environment:
+
+```bash
+php artisan digital-products:migrate-to-commerce
+```
+
+The command:
+
+- creates a Commerce product type for each digital product type, with the same UID, handle, site settings and SKU format. It allows licenses, has one variant per product, and uses the digital product type's **Download Field** as its **License Download Field**. Its variant field layout is the digital product field layout without the title field, so custom field values carry over.
+- moves the license field layout to Commerce, turns Digital Products relation fields into Variants fields, and swaps user group permissions for their Commerce equivalents: `digitalProducts-manageProductType:{uid}` becomes `commerce-viewProductType:{uid}`, `commerce-createProductType:{uid}`, `commerce-saveProductType:{uid}` and `commerce-deleteProductType:{uid}`, and `digitalProducts-manageLicenses` becomes `commerce-manageLicenses`.
+- copies the plugin settings to Commerce's license settings.
+- writes a content migration to `database/migrations/{timestamp}_migrate_digital_products_to_commerce.php` and runs it. The migration turns each digital product into the only variant of a new product, moves licenses and user permissions, and empties the plugin's tables.
+
+Each variant keeps its digital product's element ID, SKU, price, tax category and custom field values. Line items, relations and licenses keep pointing at it. The new product gets the digital product's title, slug, URI, status and dates. Licenses keep their IDs and keys.
+
+Commit the migration and your project config changes. Deploy them and run `php artisan craft:up` in each environment. Craft applies project config before it runs content migrations, so the product types exist before the migration moves the products and licenses into them.
+
+Only uninstall the plugin after every environment has run the migration. Uninstalling drops the plugin's tables, so if an environment applies the uninstall before it has run the migration, its digital products and licenses are lost.
+
+### Updating templates
+
+Commerce doesn't provide `craft.digitalProducts`, the digital products GraphQL queries or `craft:resave:digital-products`. After migrating, a digital product is a Commerce product with one variant. The product has the title and URL. The variant has the SKU, price, custom fields and the **Issues License** setting.
+
+| Digital Products | Commerce |
+| --- | --- |
+| `craft.digitalProducts.products()` | `craft.products()` (filter with `.type('handle')`) |
+| `craft.digitalProducts.licenses()` | `craft.licenses()` |
+| `craft.digitalProducts.getProductTypes()` | `craft.commerce.productTypes.allProductTypes` |
+| `product.sku`, `product.price` | `product.defaultVariant.sku`, `product.defaultVariant.price` |
+| `product.myField` (a custom field) | `product.defaultVariant.myField` |
+| `purchasableId: product.id` (add to cart) | `purchasableId: product.defaultVariant.id` |
+| `product.existingLicenses` | `craft.licenses().owner(currentUser).product(product).exists()` |
+| `license.product` | `license.variant`. `license.product` is now the Commerce product that owns the variant. |
+| `license.productName` | `license.variantName` |
+| `license.product.myField` (a custom field) | `license.variant.myField` |
+| `licenses.product('SKU')` | `licenses.variant('SKU')` |
+| `licenses.productId(id)` | `licenses.variantId(id)`. Variants keep the digital products' IDs. |
+| `.with(['product'])` on licenses | `.with(['variant'])` |
+| `actionUrl('digital-products/download/download', {licenseKey: …, assetId: …})` | `license.getDownloadUrl(asset.id)`, or `actionUrl('commerce/licenses/download', {licenseKey: …, assetId: …})` |
+| A Digital Products relation field | Returns variants. Use `variant.product.url` for a link. |
+
+License query params that stay the same: `type`, `owner`, `ownerId`, `email`, `licenseKey`, `orderId`, `before` and `after`.
+
+For example, a list of the current user's licenses with download links:
+
+```twig
+{% set licenses = craft.licenses()
+  .owner(currentUser)
+  .with(['variant', 'order'])
+  .all() %}
+
+{% for license in licenses %}
+  {% set file = license.variant.downloadFile.one() %}
+  <a href="{{ license.product.url }}">{{ license.product.title }}</a>
+  {% if file %}
+    <a href="{{ license.getDownloadUrl(file.id) }}">Download</a>
+  {% endif %}
+{% endfor %}
+```
+
+And whether the current user owns a product:
+
+```twig
+{% for product in craft.products().type('onlineCourses').all() %}
+  {% if currentUser and craft.licenses().owner(currentUser).product(product).exists() %}
+    You already own {{ product.title }}.
+  {% else %}
+    <a href="{{ product.url }}">Get it now!</a>
+  {% endif %}
+{% endfor %}
+```
 
 ## Events
 

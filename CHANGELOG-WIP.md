@@ -8,7 +8,6 @@
 - Digital Products now requires Craft CMS 6, Craft Commerce 6 and PHP 8.5.
 - Digital Products now runs on native Craft 6 and Commerce 6 APIs, without `craftcms/yii2-adapter`.
 - Sites must be on Digital Products 4.0.0 or later before upgrading.
-- When Commerce provides digital products itself and this plugin’s data has been migrated into it with `commerce:digital-products:migrate`, the plugin no longer registers its GraphQL types and queries, `craft.digitalProducts` or `craft:resave:digital-products`, which Commerce registers under the same names.
 
 ### Control Panel
 
@@ -20,6 +19,7 @@
 ### Console
 
 - Renamed `resave/digital-products` to `craft:resave:digital-products`. `craft:resave/digital-products` still works as an alias.
+- Added the `digital-products:migrate-to-commerce` command, which moves digital product types, digital products and licenses into Commerce product types, variants and licenses. See [Moving to Commerce licenses](README.md#moving-to-commerce-licenses).
 
 ### Database
 
@@ -56,6 +56,7 @@
 - Added `CraftCms\DigitalProducts\Policies\ProductPolicy` and `LicensePolicy`.
 - Added `CraftCms\DigitalProducts\Validation\ProductRules`, `ProductTypeRules` and `LicenseRules`.
 - Added `CraftCms\DigitalProducts\Console\Commands\ResaveDigitalProductsCommand`.
+- Added `CraftCms\DigitalProducts\Console\Commands\MigrateToCommerceCommand`.
 - Added `CraftCms\DigitalProducts\Http\Controllers\*`, which replace the `craft\digitalproducts\controllers\*` classes.
 - `CraftCms\DigitalProducts\Licenses::licenseProductByOrder()` now returns the new `License`, or `null`, instead of a `bool`.
 - Settings validation rules are now returned by `CraftCms\DigitalProducts\Settings::getRules()` instead of `rules()`.
