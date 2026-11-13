@@ -7,3 +7,5 @@
 vendor/
 node_modules
 /CLAUDE.md
+/.phpunit.cache
+/workbench/storage

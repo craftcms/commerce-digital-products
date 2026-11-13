@@ -1,461 +1,257 @@
 <?php
 
-namespace craft\digitalproducts;
+declare(strict_types=1);
 
-use Craft;
-use craft\base\Model;
-use craft\base\Plugin as BasePlugin;
-use craft\commerce\elements\Order;
-use craft\commerce\services\Payments as PaymentService;
-use craft\commerce\services\Purchasables;
-use craft\console\Controller as ConsoleController;
-use craft\console\controllers\ResaveController;
-use craft\digitalproducts\db\Table;
-use craft\digitalproducts\elements\License;
-use craft\digitalproducts\elements\Product;
-use craft\digitalproducts\fieldlayoutelements\ProductTitleField;
-use craft\digitalproducts\fields\Products;
-use craft\digitalproducts\gql\interfaces\elements\Product as GqlProductInterface;
-use craft\digitalproducts\gql\queries\Product as GqlProductQueries;
-use craft\digitalproducts\helpers\ProjectConfigData;
-use craft\digitalproducts\models\Settings;
-use craft\digitalproducts\plugin\Routes;
-use craft\digitalproducts\plugin\Services;
-use craft\digitalproducts\services\ProductTypes;
-use craft\digitalproducts\variables\DigitalProducts;
-use craft\events\ConfigEvent;
-use craft\events\DefineConsoleActionsEvent;
-use craft\events\DefineFieldLayoutFieldsEvent;
-use craft\events\RebuildConfigEvent;
-use craft\events\RegisterComponentTypesEvent;
-use craft\events\RegisterGqlQueriesEvent;
-use craft\events\RegisterGqlSchemaComponentsEvent;
-use craft\events\RegisterGqlTypesEvent;
-use craft\events\RegisterUserPermissionsEvent;
-use craft\helpers\ProjectConfig as ProjectConfigHelper;
-use craft\helpers\UrlHelper;
-use craft\models\FieldLayout;
-use craft\services\Elements;
-use craft\services\Fields;
-use craft\services\Gc;
-use craft\services\Gql;
-use craft\services\ProjectConfig;
-use craft\services\Sites;
-use craft\services\UserPermissions;
-use craft\services\Users as UsersService;
-use craft\web\twig\variables\CraftVariable;
-use yii\base\Event;
+namespace CraftCms\DigitalProducts;
+
+use Closure;
+use CraftCms\Cms\Cp\Data\NavItem;
+use CraftCms\Cms\FieldLayout\FieldLayout;
+use CraftCms\Cms\GarbageCollection\Events\RunningGarbageCollection;
+use CraftCms\Cms\Gql\Events\GqlSchemaComponentsResolving;
+use CraftCms\Cms\Gql\GqlQueries;
+use CraftCms\Cms\Gql\GqlTypes;
+use CraftCms\Cms\Plugin\Plugin as BasePlugin;
+use CraftCms\Cms\ProjectConfig\Events\ProjectConfigRebuilt;
+use CraftCms\Cms\ProjectConfig\ProjectConfig;
+use CraftCms\Cms\Site\Events\SiteDeleted;
+use CraftCms\Cms\Site\Events\SiteSaved;
+use CraftCms\Cms\Support\Url;
+use CraftCms\Cms\Twig\Variables\CraftVariable;
+use CraftCms\Cms\Ui\Controls\Lightswitch;
+use CraftCms\Cms\Ui\Controls\Number;
+use CraftCms\Cms\Ui\Controls\Text;
+use CraftCms\Cms\Ui\Nodes\Field;
+use CraftCms\Cms\Ui\Ui;
+use CraftCms\Cms\Ui\UiContext;
+use CraftCms\Cms\User\Data\Permission;
+use CraftCms\Cms\User\Events\UserActivated;
+use CraftCms\Commerce\Order\Events\OrderCompleted;
+use CraftCms\Commerce\Order\Events\OrderPaid;
+use CraftCms\Commerce\Payment\Events\PaymentProcessing;
+use CraftCms\Commerce\Purchasable\FieldLayoutElements\PurchasableAvailableForPurchaseField;
+use CraftCms\Commerce\Purchasable\FieldLayoutElements\PurchasablePriceField;
+use CraftCms\Commerce\Purchasable\FieldLayoutElements\PurchasablePromotableField;
+use CraftCms\Commerce\Purchasable\FieldLayoutElements\PurchasableSkuField;
+use CraftCms\Commerce\Purchasable\PurchasableTypes;
+use CraftCms\DigitalProducts\Console\Commands\MigrateToCommerceCommand;
+use CraftCms\DigitalProducts\Console\Commands\ResaveDigitalProductsCommand;
+use CraftCms\DigitalProducts\Data\ProductType;
+use CraftCms\DigitalProducts\Elements\License;
+use CraftCms\DigitalProducts\Elements\Product;
+use CraftCms\DigitalProducts\FieldLayoutElements\ProductTitleField;
+use CraftCms\DigitalProducts\Fields\Products as ProductsField;
+use CraftCms\DigitalProducts\Gql\Interfaces\Elements\Product as GqlProductInterface;
+use CraftCms\DigitalProducts\Gql\Queries\Product as GqlProductQuery;
+use CraftCms\DigitalProducts\Listeners\AssignLicensesOnUserActivation;
+use CraftCms\DigitalProducts\Listeners\GqlSchemaComponentsResolvingListener;
+use CraftCms\DigitalProducts\Listeners\IssueLicensesOnOrderCompleted;
+use CraftCms\DigitalProducts\Listeners\IssueLicensesOnOrderPaid;
+use CraftCms\DigitalProducts\Listeners\PreventGuestPayment;
+use CraftCms\DigitalProducts\Listeners\ProjectConfigRebuiltListener;
+use CraftCms\DigitalProducts\Listeners\RunningGarbageCollectionListener;
+use CraftCms\DigitalProducts\Listeners\SiteDeletedListener;
+use CraftCms\DigitalProducts\Listeners\SiteSavedListener;
+use CraftCms\DigitalProducts\Policies\LicensePolicy;
+use CraftCms\DigitalProducts\Policies\ProductPolicy;
+use CraftCms\DigitalProducts\Twig\DigitalProductsVariable;
+use Illuminate\Support\Facades\Gate;
+use Override;
+
+use function CraftCms\Cms\currentUser;
+use function CraftCms\Cms\t;
 
 /**
- * Digital Products Plugin for Craft Commerce.
- *
- * @author    Pixel & Tonic, Inc. <support@pixelandtonic.com>
- * @copyright Copyright (c) 2016, Pixel & Tonic, Inc.
+ * Digital Products for Craft Commerce.
  *
  * @method Settings getSettings()
- *
- * @property-read Settings $settings
- * @property-read array $cpNavItem
- * @property-read mixed $settingsResponse
  */
 class Plugin extends BasePlugin
 {
+    public const string HANDLE = 'digital-products';
+
+    public string $schemaVersion = '6.0.0.0';
+
     /**
-     * @inheritDoc
+     * The newest 4.x schema, so sites upgrade through the last Craft 5 release first.
      */
+    public string $minVersionRequired = '4.0.0';
+
     public bool $hasCpSection = true;
 
-    /**
-     * @inheritDoc
-     */
     public bool $hasCpSettings = true;
 
-    /**
-     * @inheritDoc
-     */
-    public string $schemaVersion = '4.0.0.4';
+    protected array $elementTypes = [
+        Product::class,
+        License::class,
+    ];
 
-    /**
-     * @inheritDoc
-     */
-    public string $minVersionRequired = '2.4.3.2';
+    protected array $fieldTypes = [
+        ProductsField::class,
+    ];
 
-    use Services;
-    use Routes;
+    protected array $events = [
+        OrderCompleted::class => IssueLicensesOnOrderCompleted::class,
+        OrderPaid::class => IssueLicensesOnOrderPaid::class,
+        PaymentProcessing::class => PreventGuestPayment::class,
+        UserActivated::class => AssignLicensesOnUserActivation::class,
+        SiteSaved::class => SiteSavedListener::class,
+        SiteDeleted::class => SiteDeletedListener::class,
+        ProjectConfigRebuilt::class => ProjectConfigRebuiltListener::class,
+        RunningGarbageCollection::class => RunningGarbageCollectionListener::class,
+        GqlSchemaComponentsResolving::class => GqlSchemaComponentsResolvingListener::class,
+    ];
 
-    /**
-     * Initialize the plugin.
-     */
-    public function init(): void
+    #[Override]
+    public function register(): void
     {
-        parent::init();
+        $this->app->singleton(Settings::class, fn () => $this->getSettings());
+    }
 
-        $this->_setPluginComponents();
-        $this->_registerFieldTypes();
-        $this->_registerPurchasableTypes();
-        $this->_registerVariable();
-        $this->_registerEventHandlers();
-        $this->_registerCpRoutes();
-        $this->_registerPermissions();
-        $this->_registerElementTypes();
-        $this->_registerGqlInterfaces();
-        $this->_registerGqlQueries();
-        $this->_registerGqlComponents();
-        $this->_defineFieldLayoutElements();
-        $this->_registerGarbageCollection();
+    public function boot(): void
+    {
+        app(PurchasableTypes::class)->register(Product::class);
 
-        if (Craft::$app->getRequest()->getIsConsoleRequest()) {
-            $this->_defineResaveCommand();
+        Gate::policy(Product::class, ProductPolicy::class);
+        Gate::policy(License::class, LicensePolicy::class);
+
+        app(GqlTypes::class)->register(GqlProductInterface::class);
+        app(GqlQueries::class)->register(GqlProductQuery::class);
+        CraftVariable::macro('digitalProducts', fn () => app(DigitalProductsVariable::class));
+        $this->commands([ResaveDigitalProductsCommand::class, MigrateToCommerceCommand::class]);
+
+        if ($this->isInstalled) {
+            $this->registerProjectConfigListeners();
         }
     }
 
-    /**
-     * @inheritdoc
-     */
-    public function getCpNavItem(): array
+    #[Override]
+    protected static function createSettings(): Settings
     {
-        $navItems = parent::getCpNavItem();
-
-        $productTypes = Plugin::getInstance()->getProductTypes()->getAllProductTypes();
-        if (count($productTypes) > 0) {
-            if (Craft::$app->getUser()->checkPermission('digitalProducts-manageProducts')) {
-                $navItems['subnav']['products'] = [
-                    'label' => Craft::t('digital-products', 'Products'),
-                    'url' => 'digital-products/products',
-                ];
-            }
-        }
-
-        if (Craft::$app->getUser()->checkPermission('digitalProducts-manageLicenses')) {
-            $navItems['subnav']['licenses'] = [
-                'label' => Craft::t('digital-products', 'Licenses'),
-                'url' => 'digital-products/licenses',
-            ];
-        }
-
-        if (Craft::$app->getUser()->getIsAdmin()) {
-            $navItems['subnav']['settings'] = [
-                'label' => Craft::t('digital-products', 'Settings'),
-                'url' => 'digital-products/settings',
-            ];
-        }
-
-        return $navItems;
+        return new Settings;
     }
 
-    /**
-     * @inheritdoc
-     */
+    #[Override]
     public function getSettingsResponse(): mixed
     {
-        return Craft::$app->getResponse()->redirect(UrlHelper::cpUrl('digital-products/settings'));
+        return redirect(Url::cpUrl('digital-products/settings'));
     }
 
-    /**
-     * Handle a changed license field layout from project config.
-     */
-    public function handleChangedLicenseFieldLayout(ConfigEvent $event): void
+    #[Override]
+    public function settingsUi(UiContext $context = new UiContext): Ui
     {
-        $data = $event->newValue;
-        $fieldsService = Craft::$app->getFields();
+        return Ui::make([
+            Field::make(t('Auto-assign licenses on purchase', category: 'digital-products'), Lightswitch::make('autoAssignUserOnPurchase'))
+                ->instructions(t('Whether licenses should automatically be assigned to existing users if the emails match.', category: 'digital-products')),
+            Field::make(t('Auto-assign licenses on registration', category: 'digital-products'), Lightswitch::make('autoAssignLicensesOnUserRegistration'))
+                ->instructions(t('Whether licenses should be automatically assigned to newly-registered users if the emails match.', category: 'digital-products')),
+            Field::make(t('License key characters', category: 'digital-products'), Text::make('licenseKeyCharacters')->monospace())
+                ->instructions(t('The available characters that can be used in license key generation.', category: 'digital-products'))
+                ->required(),
+            Field::make(t('Key length', category: 'digital-products'), Number::make('licenseKeyLength')->min(1)->max(255)->size(5))
+                ->instructions(t('The length of generated license keys.', category: 'digital-products'))
+                ->required(),
+            Field::make(t('Require a logged in user', category: 'digital-products'), Lightswitch::make('requireLoggedInUser'))
+                ->instructions(t('Whether a user must be logged in when completing an order with at least one digital product in the cart.', category: 'digital-products')),
+            Field::make(t('Generate license on order paid in full', category: 'digital-products'), Lightswitch::make('generateLicenseOnOrderPaid'))
+                ->instructions(t('Whether the license should be generated when the order is paid for in full. If not, the license will be generated when the order is completed.', category: 'digital-products')),
+        ]);
+    }
 
-        if (empty($data) || empty($config = reset($data))) {
-            $fieldsService->deleteLayoutsByType(License::class);
-            return;
+    #[Override]
+    protected function cpNavIconPath(): ?string
+    {
+        return 'file-arrow-down';
+    }
+
+    #[Override]
+    public function getCpNavItem(): NavItem|array|null
+    {
+        $item = parent::getCpNavItem();
+
+        if (! $item instanceof NavItem) {
+            return $item;
         }
 
-        ProjectConfigHelper::ensureAllFieldsProcessed();
+        $user = currentUser();
+        $subnav = [];
 
-        $layout = FieldLayout::createFromConfig($config);
-        $layout->id = $fieldsService->getLayoutByType(License::class)->id;
-        $layout->type = License::class;
-        $layout->uid = key($data);
-        $fieldsService->saveLayout($layout, false);
-
-        Craft::$app->getElements()->invalidateCachesForElementType(License::class);
-    }
-
-    // Protected Methods
-    // =========================================================================
-
-    /**
-     * @inheritdoc
-     */
-    protected function createSettingsModel(): ?Model
-    {
-        return new Settings();
-    }
-
-    // Private Methods
-    // =========================================================================
-
-    private function _defineFieldLayoutElements(): void
-    {
-        Event::on(FieldLayout::class, FieldLayout::EVENT_DEFINE_NATIVE_FIELDS, static function(DefineFieldLayoutFieldsEvent $e) {
-            /** @var FieldLayout $fieldLayout */
-            $fieldLayout = $e->sender;
-
-            if ($fieldLayout->type == Product::class) {
-                $e->fields[] = ProductTitleField::class;
-            }
-        });
-    }
-
-    /**
-     * Defines the `resave/digital-products` command.
-     *
-     * @since 3.0.1
-     */
-    private function _defineResaveCommand(): void
-    {
-        Event::on(ResaveController::class, ConsoleController::EVENT_DEFINE_ACTIONS, static function(DefineConsoleActionsEvent $e) {
-            $e->actions['digital-products'] = [
-                'action' => function(): int {
-                    /** @var ResaveController $controller */
-                    $controller = Craft::$app->controller;
-                    $criteria = [];
-                    if ($controller->type !== null) {
-                        $criteria['type'] = explode(',', $controller->type);
-                    }
-
-                    return $controller->resaveElements(Product::class, $criteria);
-                },
-                'options' => ['type'],
-                'helpSummary' => 'Re-saves Commerce digital products.',
-                'optionsHelp' => [
-                    'type' => 'The product type handle(s) of the digital products to resave.',
-                ],
-            ];
-        });
-    }
-
-    /**
-     * Register the event handlers.
-     */
-    private function _registerEventHandlers(): void
-    {
-        Event::on(
-            UsersService::class,
-            UsersService::EVENT_AFTER_ACTIVATE_USER,
-            [$this->getLicenses(), 'handleUserActivation']
-        );
-
-        Event::on(
-            PaymentService::class,
-            PaymentService::EVENT_BEFORE_PROCESS_PAYMENT,
-            [$this->getLicenses(), 'maybePreventPayment']
-        );
-
-        if ($this->getSettings()->generateLicenseOnOrderPaid) {
-            Event::on(
-                Order::class,
-                Order::EVENT_AFTER_ORDER_PAID,
-                [$this->getLicenses(), 'handleCompletedOrder']
-            );
-        } else {
-            Event::on(
-                Order::class,
-                Order::EVENT_AFTER_COMPLETE_ORDER,
-                [$this->getLicenses(), 'handleCompletedOrder']
-            );
+        if (app(ProductTypes::class)->getEditableProductTypes() !== []) {
+            $subnav[] = new NavItem()
+                ->label(t('Products', category: 'digital-products'))
+                ->url('digital-products/products');
         }
 
-        Event::on(
-            Sites::class,
-            Sites::EVENT_AFTER_SAVE_SITE,
-            [$this->getProductTypes(), 'afterSaveSiteHandler']
-        );
+        if ($user?->can('digitalProducts-manageLicenses')) {
+            $subnav[] = new NavItem()
+                ->label(t('Licenses', category: 'digital-products'))
+                ->url('digital-products/licenses');
+        }
 
-        Event::on(
-            Sites::class,
-            Sites::EVENT_AFTER_SAVE_SITE,
-            [$this->getProducts(), 'afterSaveSiteHandler']
-        );
+        if ($user?->isAdmin()) {
+            $subnav[] = new NavItem()
+                ->label(t('Settings', category: 'app'))
+                ->url('digital-products/settings');
+        }
 
-        $projectConfigService = Craft::$app->getProjectConfig();
-        $productTypeService = $this->getProductTypes();
-        $projectConfigService->onAdd(ProductTypes::CONFIG_PRODUCTTYPES_KEY . '.{uid}', [$productTypeService, 'handleChangedProductType'])
-            ->onUpdate(ProductTypes::CONFIG_PRODUCTTYPES_KEY . '.{uid}', [$productTypeService, 'handleChangedProductType'])
-            ->onRemove(ProductTypes::CONFIG_PRODUCTTYPES_KEY . '.{uid}', [$productTypeService, 'handleDeletedProductType']);
-
-        $projectConfigService->onAdd('digital-products.licenseFieldLayouts', [$this, 'handleChangedLicenseFieldLayout'])
-            ->onUpdate('digital-products.licenseFieldLayouts', [$this, 'handleChangedLicenseFieldLayout'])
-            ->onRemove('digital-products.licenseFieldLayouts', [$this, 'handleChangedLicenseFieldLayout']);
-
-        Event::on(
-            Sites::class,
-            Sites::EVENT_AFTER_DELETE_SITE,
-            [$productTypeService, 'pruneDeletedSite']
-        );
-
-        Event::on(
-            ProjectConfig::class,
-            ProjectConfig::EVENT_REBUILD,
-            static function(RebuildConfigEvent $event) {
-                $event->config['digital-products'] = ProjectConfigData::rebuildProjectConfig();
-            }
-        );
+        return $item->subnav($subnav);
     }
 
-    /**
-     * Register Commerce’s fields
-     */
-    private function _registerFieldTypes(): void
+    #[Override]
+    protected function getPermissions(): array
     {
-        Event::on(
-            Fields::class,
-            Fields::EVENT_REGISTER_FIELD_TYPES,
-            static function(RegisterComponentTypesEvent $event) {
-                $event->types[] = Products::class;
-            }
-        );
+        $productTypePermissions = collect(app(ProductTypes::class)->getAllProductTypes())
+            ->map(fn (ProductType $productType) => new Permission(
+                key: "digitalProducts-manageProductType:$productType->uid",
+                label: t('Manage “{type}” products', ['type' => t($productType->name, category: 'site')], 'digital-products'),
+            ))
+            ->values();
+
+        return [
+            new Permission(
+                key: 'digitalProducts-manageProducts',
+                label: t('Manage products', category: 'digital-products'),
+                nested: $productTypePermissions,
+            ),
+            new Permission(
+                key: 'digitalProducts-manageLicenses',
+                label: t('Manage licenses', category: 'digital-products'),
+            ),
+            new Permission(
+                key: 'digitalProducts-manageProductTypes',
+                label: t('Manage product types', category: 'digital-products'),
+            ),
+        ];
     }
 
-    /**
-     * Register Commerce’s purchasable
-     */
-    private function _registerPurchasableTypes(): void
+    #[Override]
+    protected function getNativeFields(): ?Closure
     {
-        Event::on(
-            Purchasables::class,
-            Purchasables::EVENT_REGISTER_PURCHASABLE_ELEMENT_TYPES,
-            static function(RegisterComponentTypesEvent $event) {
-                $event->types[] = Product::class;
-            }
-        );
-    }
-
-    /**
-     * Register Digital Product permissions
-     */
-    private function _registerPermissions(): void
-    {
-        Event::on(
-            UserPermissions::class,
-            UserPermissions::EVENT_REGISTER_PERMISSIONS,
-            function(RegisterUserPermissionsEvent $event) {
-                $productTypes = $this->getProductTypes()->getAllProductTypes();
-
-                $productTypePermissions = [];
-
-                foreach ($productTypes as $productType) {
-                    $suffix = ':' . $productType->uid;
-                    $productTypePermissions['digitalProducts-manageProductType' . $suffix] = ['label' => Craft::t('digital-products', 'Manage “{type}” products', ['type' => $productType->name])];
-                }
-
-                $event->permissions[] = [
-                    'heading' => Craft::t('digital-products', 'Digital Products'),
-                    'permissions' => [
-                        'digitalProducts-manageProducts' => ['label' => Craft::t('digital-products', 'Manage products'), 'nested' => $productTypePermissions],
-                        'digitalProducts-manageLicenses' => ['label' => Craft::t('digital-products', 'Manage licenses')],
-                    ],
-                ];
-            }
-        );
-    }
-
-    /**
-     * Register Digital Product template variable
-     */
-    private function _registerVariable(): void
-    {
-        Event::on(
-            CraftVariable::class,
-            CraftVariable::EVENT_INIT,
-            static function(Event $event) {
-                /** @var CraftVariable $variable */
-                $variable = $event->sender;
-                $variable->set('digitalProducts', DigitalProducts::class);
-            }
-        );
-    }
-
-    /**
-     * Register the element types supplied by Digital Products
-     */
-    private function _registerElementTypes(): void
-    {
-        Event::on(
-            Elements::class,
-            Elements::EVENT_REGISTER_ELEMENT_TYPES,
-            static function(RegisterComponentTypesEvent $e) {
-                $e->types[] = Product::class;
-                $e->types[] = License::class;
-            }
-        );
-    }
-
-    /**
-     * Register the Gql interfaces
-     */
-    private function _registerGqlInterfaces(): void
-    {
-        Event::on(
-            Gql::class,
-            Gql::EVENT_REGISTER_GQL_TYPES,
-            static function(RegisterGqlTypesEvent $event) {
-                // Add my GraphQL types
-                $types = $event->types;
-                $types[] = GqlProductInterface::class;
-                $event->types = $types;
-            }
-        );
-    }
-
-    /**
-     * Register the Gql queries
-     */
-    private function _registerGqlQueries(): void
-    {
-        Event::on(Gql::class, Gql::EVENT_REGISTER_GQL_QUERIES, static function(RegisterGqlQueriesEvent $event) {
-            $event->queries = array_merge(
-                $event->queries,
-                GqlProductQueries::getQueries(),
-            );
-        });
-    }
-
-    /**
-     * Register the Gql components
-     *
-     * @return void
-     */
-    private function _registerGqlComponents(): void
-    {
-        Event::on(Gql::class, Gql::EVENT_REGISTER_GQL_SCHEMA_COMPONENTS, static function(RegisterGqlSchemaComponentsEvent $event) {
-            $queryComponents = [];
-
-            $productTypes = Plugin::getInstance()->getProductTypes()->getAllProductTypes();
-
-            if (!empty($productTypes)) {
-                $label = Craft::t('digital-products', 'Digital Products');
-                $productPermissions = [];
-
-                foreach ($productTypes as $productType) {
-                    $suffix = 'digitalProductTypes.' . $productType->uid;
-                    $productPermissions[$suffix . ':read'] = ['label' => Craft::t('digital-products', 'View digital product type - {productType}', ['productType' => Craft::t('site', $productType->name)])];
-                }
-
-                $queryComponents[$label] = $productPermissions;
+        return function (FieldLayout $fieldLayout, array $fields): array {
+            if ($fieldLayout->type === Product::class) {
+                $fields[] = ProductTitleField::class;
+                $fields[] = PurchasableSkuField::class;
+                $fields[] = PurchasablePriceField::class;
+                $fields[] = PurchasableAvailableForPurchaseField::class;
+                $fields[] = PurchasablePromotableField::class;
             }
 
-            $event->queries = array_merge($event->queries, $queryComponents);
-        });
+            return $fields;
+        };
     }
 
-    /**
-     * Register the things that need to be garbage collected
-     *
-     * @since 3.1
-     */
-    private function _registerGarbageCollection(): void
+    private function registerProjectConfigListeners(): void
     {
-        Event::on(Gc::class, Gc::EVENT_RUN, function(Event $event) {
-            // Delete partial elements
-            /** @var Gc $gc */
-            $gc = $event->sender;
-            $gc->deletePartialElements(Product::class, Table::PRODUCTS, 'id');
-            $gc->deletePartialElements(License::class, Table::LICENSES, 'id');
-        });
+        $projectConfig = app(ProjectConfig::class);
+        $productTypes = app(ProductTypes::class);
+        $licenses = app(Licenses::class);
+
+        $projectConfig->onAdd(ProductTypes::CONFIG_PRODUCTTYPES_KEY.'.{uid}', $productTypes->handleChangedProductType(...))
+            ->onUpdate(ProductTypes::CONFIG_PRODUCTTYPES_KEY.'.{uid}', $productTypes->handleChangedProductType(...))
+            ->onRemove(ProductTypes::CONFIG_PRODUCTTYPES_KEY.'.{uid}', $productTypes->handleDeletedProductType(...));
+
+        $projectConfig->onAdd(Licenses::CONFIG_FIELDLAYOUT_KEY, $licenses->handleChangedFieldLayout(...))
+            ->onUpdate(Licenses::CONFIG_FIELDLAYOUT_KEY, $licenses->handleChangedFieldLayout(...))
+            ->onRemove(Licenses::CONFIG_FIELDLAYOUT_KEY, $licenses->handleDeletedFieldLayout(...));
     }
 }

@@ -13,7 +13,10 @@
 /SECURITY.md export-ignore
 /codeception.yml export-ignore
 /composer.lock export-ignore
-/ecs.php export-ignore
+/pint.json export-ignore
+/phpunit.xml export-ignore
+/testbench.yaml export-ignore
+/workbench/ export-ignore
 /phpstan.neon export-ignore
 /.prettierrc.json export-ignore
 /.prettierignore export-ignore
@@ -24,7 +27,6 @@
 /package-lock.json export-ignore
 /tsconfig.json export-ignore
 /webpack.config.js export-ignore
-/stubs/ export-ignore
 /tests/ export-ignore
 /packages/ export-ignore
 /.ddev/ export-ignore
