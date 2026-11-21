@@ -86,7 +86,7 @@ return [
     'Are you sure you want to delete this license?' => 'Jeste li sigurni da želite izbrisati ovu licencu?',
     'Are you sure you want to delete this product?' => 'Jeste li sigurni da želite izbrisati ovaj proizvod?',
     'Are you sure you want to delete “{name}” and all its products?' => 'Jeste li sigurni da želite izbrisati „{name}“ i sve njegove proizvode?',
-    'Associated Sales' => 'Povezana sniženja',
+    'Associated Sales' => 'Povezane akcije',
     'Configure the product type’s site-specific settings.' => 'Konfigurirajte postavke vrste proizvoda specifične za web-mjesto.',
     'Couldn\'t create license.' => 'Nije moguće stvoriti licencu.',
     'Couldn\'t create product.' => 'Nije moguće stvoriti proizvod.',

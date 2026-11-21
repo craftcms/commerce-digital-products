@@ -86,7 +86,7 @@ return [
     'Are you sure you want to delete this license?' => 'Apakah Anda yakin ingin menghapus lisensi ini?',
     'Are you sure you want to delete this product?' => 'Apakah Anda yakin ingin menghapus produk ini?',
     'Are you sure you want to delete “{name}” and all its products?' => 'Apakah Anda yakin ingin menghapus “{name}” dan semua produknya?',
-    'Associated Sales' => 'Promo Terkait',
+    'Associated Sales' => 'Obral Terkait',
     'Configure the product type’s site-specific settings.' => 'Konfigurasikan pengaturan khusus situs untuk jenis produk ini.',
     'Couldn\'t create license.' => 'Tidak dapat membuat lisensi.',
     'Couldn\'t create product.' => 'Tidak dapat membuat produk.',
