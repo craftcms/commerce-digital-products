@@ -47,9 +47,9 @@ class GeneralSettingsController extends BaseSettingsController
         abort_if($this->readOnly, 403, 'Administrative changes are disallowed in this environment.');
 
         if (! $plugins->savePluginSettings($plugin, (array) $request->input('settings', []))) {
-            return $this->asModelFailure($plugin->getSettings(), t('Couldn’t save settings.', category: 'app'), 'settings');
+            return $this->asModelFailure($plugin->getSettings(), t('Couldn’t save settings.', category: 'digital-products'), 'settings');
         }
 
-        return $this->asSuccess(t('Settings saved.', category: 'app'));
+        return $this->asSuccess(t('Settings saved.', category: 'digital-products'));
     }
 }
