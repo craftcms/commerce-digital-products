@@ -102,7 +102,7 @@ return [
     'View order' => 'Afficher la commande',
     'View order no. {number}' => 'Afficher la commande n° {number}',
     'What product type URIs should look like for the site.' => 'Ce à quoi les URI de types de produits devraient ressembler pour le site.',
-    'What the unique auto-generated SKUs should look like, when a SKU field is submitted without a value. You can include tags that output properties, such as {ex1} or {ex2}' => 'Ce à quoi les UGS auto-générés devraient ressembler, lorsqu’un champ d’UGS est soumis à vide. Vous pouvez inclure des étiquettes qui sélectionnent les propriétés, comme {ex1} ou {ex2}.',
+    'What the unique auto-generated SKUs should look like, when a SKU field is submitted without a value. You can include tags that output properties, such as {ex1} or {ex2}' => 'Ce à quoi les UGS uniques auto-générées devraient ressembler, lorsqu’un champ d’UGS est soumis sans valeur. Vous pouvez inclure des balises qui affichent des propriétés, comme {ex1} ou {ex2}.',
     'What this product type will be called in the CP.' => 'Nom de ce type de produit dans le panneau de configuration.',
     'Whether a user must be logged in when completing an order with at least one digital product in the cart.' => 'Indique si l’utilisateur doit être connecté pour finaliser une commande dont le panier contient au moins un produit numérique.',
     'Whether licenses should automatically be assigned to existing users if the emails match.' => 'Indique si les licences doivent être automatiquement attribuées aux utilisateurs existants dont le courriel correspond.',

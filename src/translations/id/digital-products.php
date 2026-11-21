@@ -12,7 +12,7 @@ return [
     'Are you sure you want to delete this product?' => 'Apakah Anda yakin ingin menghapus produk ini?',
     'Are you sure you want to delete “{name}” and all its products?' => 'Apakah Anda yakin ingin menghapus “{name}” dan semua produknya?',
     'Associated Order' => 'Pesanan Terkait',
-    'Associated Sales' => 'Diskon Penjualan Terkait',
+    'Associated Sales' => 'Promo Terkait',
     'Auto-assign licenses on purchase' => 'Tetapkan lisensi secara otomatis saat pembelian',
     'Auto-assign licenses on registration' => 'Tetapkan lisensi secara otomatis saat pendaftaran',
     'Automatic SKU Format' => 'Format SKU Otomatis',

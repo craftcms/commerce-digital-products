@@ -34,7 +34,7 @@ return [
     'Enabled?' => 'Увімкнено?',
     'Enter SKU' => 'Введіть SKU',
     'Enter price' => 'Введіть ціну',
-    'Enter slug' => 'Введіть поле змінюваних даних',
+    'Enter slug' => 'Введіть частину посилання',
     'Enter title' => 'Введіть заголовок',
     'Generate license on order paid in full' => 'Створювати ліцензію після повної оплати замовлення',
     'How you’ll refer to this product type in the templates.' => 'Назва цього типу продукту в шаблонах.',

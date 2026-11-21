@@ -6,7 +6,7 @@ return [
     'Add a digital product' => 'Legg til eit digitalt produkt',
     'All product types' => 'Alle produkttypar',
     'All products' => 'Alle produkt',
-    'Any related asset' => 'Kva som helst relatert fil',
+    'Any related asset' => 'Ein kvar relatert fil',
     'Are you sure you want to delete the selected products?' => 'Er du sikker på at du vil slette dei valde produkta?',
     'Are you sure you want to delete this license?' => 'Er du sikker på at du vil slette denne lisensen?',
     'Are you sure you want to delete this product?' => 'Er du sikker på at du vil slette dette produktet?',

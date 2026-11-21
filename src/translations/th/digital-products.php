@@ -51,7 +51,7 @@ return [
     'License key' => 'คีย์ใบอนุญาต',
     'License key characters' => 'อักขระของคีย์ใบอนุญาต',
     'License saved.' => 'บันทึกใบอนุญาตแล้ว',
-    'Licensed Product' => 'สินค้าที่ได้รับอนุญาต',
+    'Licensed Product' => 'สินค้าตามใบอนุญาต',
     'Licensed To' => 'ผู้ถือใบอนุญาต',
     'Licenses' => 'ใบอนุญาต',
     'Live Preview' => 'ดูตัวอย่างสด',

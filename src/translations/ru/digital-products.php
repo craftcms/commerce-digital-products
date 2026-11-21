@@ -34,7 +34,7 @@ return [
     'Enabled?' => 'Включено?',
     'Enter SKU' => 'Введите SKU',
     'Enter price' => 'Введите цену',
-    'Enter slug' => 'Введите поле динамичных данных',
+    'Enter slug' => 'Введите ярлык',
     'Enter title' => 'Введите название',
     'Generate license on order paid in full' => 'Создавать лицензию после полной оплаты заказа',
     'How you’ll refer to this product type in the templates.' => 'Как вы будете обращаться к этому типу продукта в шаблонах.',

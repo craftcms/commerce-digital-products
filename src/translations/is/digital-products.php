@@ -34,7 +34,7 @@ return [
     'Enabled?' => 'Virkt?',
     'Enter SKU' => 'Sláðu inn SKU',
     'Enter price' => 'Sláðu inn verð',
-    'Enter slug' => 'Sláðu inn snigil',
+    'Enter slug' => 'Sláðu inn slóðarheiti',
     'Enter title' => 'Sláðu inn titil',
     'Generate license on order paid in full' => 'Búa til leyfi þegar pöntun er fullgreidd',
     'How you’ll refer to this product type in the templates.' => 'Hvernig þú munt vísa til vörutegundarinnar í sniðmátunum.',
