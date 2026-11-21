@@ -67,7 +67,7 @@ return [
     'The length of generated license keys.' => 'De lengte van gegenereerde licentiesleutels.',
     'View digital product type - {productType}' => 'Digitaal producttype bekijken - {productType}',
     'View order' => 'Bestelling bekijken',
-    'What product URIs should look like for the site. Leave blank if products don’t have URLs.' => 'De notatie van product-URI’s voor de website. Laat dit leeg als producten geen URL’s hebben.',
+    'What product URIs should look like for the site. Leave blank if products don’t have URLs.' => 'De notatie van product-URI\'s voor de website. Laat dit leeg als producten geen URL\'s hebben.',
     'What the unique auto-generated SKUs should look like, when a SKU field is submitted without a value. You can include tags that output properties, such as {ex1} or {ex2}' => 'Hoe de unieke, automatisch gegenereerde artikelnummers eruit moeten zien wanneer een artikelnummerveld zonder waarde wordt verzonden. U kunt tags opnemen die eigenschappen weergeven, zoals {ex1} of {ex2}',
     'What this product type will be called in the control panel.' => 'Naam van dit producttype in het configuratiescherm.',
     'Whether a user must be logged in when completing an order with at least one digital product in the cart.' => 'Of een gebruiker ingelogd moet zijn bij het voltooien van een bestelling met ten minste één digitaal product in de winkelwagen.',
@@ -125,7 +125,7 @@ return [
     'The length of generated license keys. Must be between 0 and 256.' => 'De lengte van gegenereerde licentiesleutels. Moet tussen 0 en 256 liggen.',
     'The license key is generated automatically' => 'De licentiesleutel wordt automatisch gegenereerd',
     'View order no. {number}' => 'Bestelling nr. {number} bekijken',
-    'What product type URIs should look like for the site.' => 'De notatie van producttype-URI’s voor de website.',
+    'What product type URIs should look like for the site.' => 'De notatie van producttype-URI\'s voor de website.',
     'What this product type will be called in the CP.' => 'Naam van dit producttype in het configuratiescherm.',
     'Which Assets field holds the files that licenses can download with the `digital-products/download/download` action. Add the field to the field layout and save the product type first for it to appear here.' => 'Welk bestandenveld de bestanden bevat die licentiehouders kunnen downloaden met de actie `digital-products/download/download`. Voeg het veld toe aan de veldopmaak en sla eerst het producttype op om het hier te laten verschijnen.',
 ];
