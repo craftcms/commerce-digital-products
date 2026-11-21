@@ -84,7 +84,7 @@ class ProductsController extends BaseController
         $success = Craft::$app->getDrafts()->saveElementAsDraft($product, $user->id, markAsSaved: false);
 
         if (!$success) {
-            return $this->asModelFailure($product, Craft::t('digital-products', 'Couldn\'t create product.'), 'product');
+            return $this->asModelFailure($product, Craft::t('digital-products', 'Couldn’t create product.'), 'product');
         }
 
         $editUrl = $product->getCpEditUrl();
@@ -120,7 +120,7 @@ class ProductsController extends BaseController
             ->one();
 
         if (!$product) {
-            throw new Exception(Craft::t('digital-products', 'No product exists with the ID "{id}".', ['id' => $productId]));
+            throw new Exception(Craft::t('digital-products', 'No product exists with the ID “{id}”.', ['id' => $productId]));
         }
 
         $productType = $product->getType();
@@ -134,8 +134,8 @@ class ProductsController extends BaseController
             }
 
             $error = $licensesExist
-                ? Craft::t('digital-products', 'Couldn\'t delete product with existing licenses.')
-                : Craft::t('digital-products', 'Couldn\'t delete product.');
+                ? Craft::t('digital-products', 'Couldn’t delete product with existing licenses.')
+                : Craft::t('digital-products', 'Couldn’t delete product.');
 
             Craft::$app->getSession()->setError($error);
 
