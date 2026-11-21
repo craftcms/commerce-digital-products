@@ -58,7 +58,7 @@ class LicensesController extends BaseController
 
         $license->setScenario(Element::SCENARIO_ESSENTIALS);
         if (!Craft::$app->getElements()->saveElement($license)) {
-            return $this->asModelFailure($license, Craft::t('digital-products', 'Couldn\'t create license.'), 'license');
+            return $this->asModelFailure($license, Craft::t('digital-products', 'Couldn’t create license.'), 'license');
         }
 
         $editUrl = $license->getCpEditUrl();

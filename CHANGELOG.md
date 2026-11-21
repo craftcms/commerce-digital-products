@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Control panel messages now use typographic quotes and apostrophes.
 - Digital Products is now translated into 33 languages.
 - Fixed control panel strings that weren’t translatable or used the wrong translation category.
 

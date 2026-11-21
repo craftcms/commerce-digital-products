@@ -38,7 +38,7 @@ class SettingsController extends BaseController
         $fieldLayout->type = License::class;
 
         if (!Craft::$app->getFields()->saveLayout($fieldLayout)) {
-            Craft::$app->getSession()->setError(Craft::t('digital-products', 'Couldn\'t save license fields.'));
+            Craft::$app->getSession()->setError(Craft::t('digital-products', 'Couldn’t save license fields.'));
             return $this->renderTemplate('digital-products/settings/licenses');
         }
 
