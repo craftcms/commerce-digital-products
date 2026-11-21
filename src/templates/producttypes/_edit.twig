@@ -17,7 +17,7 @@
 
   {{ forms.textField({
     first: true,
-    label: "Name"|t('digital-products'),
+    label: "Name"|t('app'),
     instructions: "What this product type will be called in the CP."|t('digital-products'),
     id: 'name',
     name: 'name',
@@ -29,7 +29,7 @@
   }) }}
 
   {{ forms.textField({
-    label: "Handle"|t('digital-products'),
+    label: "Handle"|t('app'),
     instructions: "How you’ll refer to this product type in the templates."|t('digital-products'),
     id: 'handle',
     class: 'code',
@@ -95,7 +95,7 @@
 
   {{ forms.editableTableField({
     label: "Site Settings"|t('app'),
-    instructions: "Configure the product types’s site-specific settings."|t('app'),
+    instructions: "Configure the product type’s site-specific settings."|t('digital-products'),
     id: 'sites',
     name: 'sites',
     cols: {
@@ -106,8 +106,8 @@
       },
       uriFormat: {
         type: 'singleline',
-        heading: "Product type URI Format"|t('app'),
-        info: "What product type URIs should look like for the site."|t('app'),
+        heading: "Product type URI Format"|t('digital-products'),
+        info: "What product type URIs should look like for the site."|t('digital-products'),
         placeholder: "Leave blank if categories don’t have URLs"|t('app'),
         code: true
       },

@@ -19,7 +19,7 @@ class Products extends BaseRelationField
      */
     public static function displayName(): string
     {
-        return Craft::t('commerce', 'Digital Products');
+        return Craft::t('digital-products', 'Digital Products');
     }
 
     /**
@@ -35,6 +35,6 @@ class Products extends BaseRelationField
      */
     public static function defaultSelectionLabel(): string
     {
-        return Craft::t('commerce', 'Add a digital product');
+        return Craft::t('digital-products', 'Add a digital product');
     }
 }

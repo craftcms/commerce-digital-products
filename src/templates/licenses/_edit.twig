@@ -5,7 +5,7 @@
 
 {% import "_includes/forms" as forms %}
 
-{% set statusOptions = [{label: 'Active'|t('digital-products'), value: 1}, {label: 'Disabled'|t('digital-products'), value: 0}] %}
+{% set statusOptions = [{label: 'Active'|t('app'), value: 1}, {label: 'Disabled'|t('app'), value: 0}] %}
 
 {% block content %}
   <input type="hidden" name="action" value="digital-products/licenses/save">
@@ -39,7 +39,7 @@
         <div class="right">
           <input type="button"
             class="btn small formsubmit"
-            value="{{ 'Delete'|t('digital-products') }}"
+            value="{{ 'Delete'|t('app') }}"
             data-action="digital-products/licenses/delete"
             data-confirm="{{ 'Are you sure you want to delete this license?'|t('digital-products') }}"
             data-redirect="{{ 'digital-products/licenses'|hash }}"
@@ -57,11 +57,11 @@
   <div class="meta">
     {% if license.orderId %}
       {% set productInput %}
-        <a href="{{ license.getOrderEditUrl() }}">View order no. {{ license.orderId }}</a>
+        <a href="{{ license.getOrderEditUrl() }}">{{ 'View order no. {number}'|t('digital-products', { number: license.orderId }) }}</a>
       {% endset %}
     {% else %}
       {% set productInput %}
-        No order associated with license.
+        {{ 'No order associated with license.'|t('digital-products') }}
       {% endset %}
     {% endif %}
     {{ forms.field({

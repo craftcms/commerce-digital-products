@@ -3,7 +3,7 @@
 
 {% set crumbs = [
   { label: "Digital Products"|t('digital-products'), url: url('digital-products/index') },
-  { label: productType.name|t('digital-products'), url: url('digital-products/products/'~productType.handle) },
+  { label: productType.name|t('site'), url: url('digital-products/products/'~productType.handle) },
 ] %}
 
 {% set fullPageForm = true %}
@@ -18,7 +18,7 @@
   <div class="flex-grow"></div>
 
   {% if showPreviewBtn %}
-    <div class="btn livepreviewbtn">{{ "Live Preview"|t('app') }}</div>
+    <div class="btn livepreviewbtn">{{ "Live Preview"|t('digital-products') }}</div>
   {% endif %}
   {% if shareUrl is defined %}
     <a href="{{ shareUrl }}" class="btn sharebtn" rel="noopener" target="_blank">{{ 'Share'|t('app') }}</a>
@@ -29,13 +29,13 @@
 
 {% block actionButton %}
   <div class="btngroup">
-    <input type="submit" class="btn submit" value="{{ 'Save'|t('digital-products') }}">
+    <input type="submit" class="btn submit" value="{{ 'Save'|t('app') }}">
     <div class="btn submit menubtn"></div>
     <div class="menu">
       <ul>
         <li>
           <a class="formsubmit" data-redirect="{{ continueEditingUrl|hash }}">
-            {{ "Save and continue editing"|t('digital-products') }}
+            {{ "Save and continue editing"|t('app') }}
             {{ forms.optionShortcutLabel('S') }}
           </a>
         </li>
@@ -51,8 +51,8 @@
           <hr>
           <ul>
             <li>
-              <a class="formsubmit error" data-action="digital-products/products/delete-product" data-confirm="{{ 'Are you sure you want to delete this product?'|t('commerce') }}" data-redirect="{{ 'digital-products/products/products'|hash }}">
-                {{ 'Delete'|t('digital-products') }}
+              <a class="formsubmit error" data-action="digital-products/products/delete-product" data-confirm="{{ 'Are you sure you want to delete this product?'|t('digital-products') }}" data-redirect="{{ 'digital-products/products/products'|hash }}">
+                {{ 'Delete'|t('app') }}
               </a>
             </li>
           </ul>
@@ -100,7 +100,7 @@
         <div class="right">
           <input type="button"
             class="btn small formsubmit"
-            value="{{ 'Delete'|t('digital-products') }}"
+            value="{{ 'Delete'|t('app') }}"
             data-action="digital-products/products/delete-product"
             data-confirm="{{ 'Are you sure you want to delete this product?'|t('digital-products') }}"
             data-redirect="{{ 'digital-products/products'|hash }}"
@@ -111,7 +111,7 @@
 
     {{ forms.field({
       id: 'enabled',
-      label: 'Enabled'|t('commerce')
+      label: 'Enabled'|t('app')
     }, statusInput) }}
   </div>
   <hr>
@@ -131,11 +131,11 @@
     <hr>
     <div class="meta read-only">
       <div class="data">
-        <h5 class="heading">{{ "Date Created"|t('digital-products') }}</h5>
+        <h5 class="heading">{{ "Date Created"|t('app') }}</h5>
         <div class="value">{{ product.dateCreated|date('short') }} {{ product.dateCreated|time('short') }}</div>
       </div>
       <div class="data">
-        <h5 class="heading">{{ "Date Updated"|t('digital-products') }}</h5>
+        <h5 class="heading">{{ "Date Updated"|t('app') }}</h5>
         <div class="value">{{ product.dateUpdated|date('short') }} {{ product.dateUpdated|time('short') }}</div>
       </div>
       {% if promotion is defined and promotions.sales|length %}
