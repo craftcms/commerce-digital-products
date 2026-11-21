@@ -100,7 +100,7 @@ return [
     'Enabled?' => 'Virkt?',
     'Enter SKU' => 'Sláðu inn SKU',
     'Enter price' => 'Sláðu inn verð',
-    'Enter slug' => 'Sláðu inn snigil',
+    'Enter slug' => 'Sláðu inn slóðarheiti',
     'Enter title' => 'Sláðu inn titil',
     'License Key' => 'Leyfislykill',
     'License deleted.' => 'Leyfi eytt.',

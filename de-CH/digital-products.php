@@ -11,7 +11,7 @@ return [
     'Auto-assign licenses on purchase' => 'Lizenzen beim Kauf automatisch zuweisen',
     'Auto-assign licenses on registration' => 'Lizenzen bei der Registrierung automatisch zuweisen',
     'Automatic SKU Format' => 'Automatisches Format für die Bestandseinheit (SKU)',
-    'Choose which sites this product type should be available in, and configure the site-specific settings.' => 'Wähle, in welchen Sites dieser Produkttyp verfügbar sein soll, und konfiguriere die sitespezifischen Einstellungen.',
+    'Choose which sites this product type should be available in, and configure the site-specific settings.' => 'Wähle, in welchen Websites dieser Produkttyp verfügbar sein soll, und konfiguriere die sitespezifischen Einstellungen.',
     'Couldn’t create license.' => 'Lizenz konnte nicht erstellt werden.',
     'Couldn’t delete product with existing licenses.' => 'Produkt mit vorhandenen Lizenzen konnte nicht gelöscht werden.',
     'Couldn’t save license fields.' => 'Lizenzfelder konnten nicht gespeichert werden.',

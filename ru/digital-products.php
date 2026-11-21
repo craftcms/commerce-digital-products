@@ -100,7 +100,7 @@ return [
     'Enabled?' => 'Включено?',
     'Enter SKU' => 'Введите SKU',
     'Enter price' => 'Введите цену',
-    'Enter slug' => 'Введите поле динамичных данных',
+    'Enter slug' => 'Введите ярлык',
     'Enter title' => 'Введите название',
     'License Key' => 'Лицензионный ключ',
     'License deleted.' => 'Лицензия удалена.',
