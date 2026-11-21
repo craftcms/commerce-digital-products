@@ -32,7 +32,7 @@ return [
     'License for “{product}”' => 'ใบอนุญาตสำหรับ “{product}”',
     'License issue date' => 'วันที่ออกใบอนุญาต',
     'License key characters' => 'อักขระของคีย์ใบอนุญาต',
-    'Licensed Product' => 'สินค้าที่ได้รับอนุญาต',
+    'Licensed Product' => 'สินค้าตามใบอนุญาต',
     'Licensed To' => 'ผู้ถือใบอนุญาต',
     'Licenses' => 'ใบอนุญาต',
     'Manage licenses' => 'จัดการใบอนุญาต',

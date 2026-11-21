@@ -4,7 +4,7 @@ return [
     'Add a digital product' => 'Legg til eit digitalt produkt',
     'All product types' => 'Alle produkttypar',
     'All products' => 'Alle produkt',
-    'Any related asset' => 'Kva som helst relatert fil',
+    'Any related asset' => 'Ein kvar relatert fil',
     'Are you sure you want to delete the selected products?' => 'Er du sikker på at du vil slette dei valde produkta?',
     'Associated Order' => 'Tilknytt ordre',
     'At least one site must be enabled for the product type.' => 'Minst éin nettstad må vere aktivert for produkttypen.',

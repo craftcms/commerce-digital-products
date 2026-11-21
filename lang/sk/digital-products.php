@@ -10,7 +10,7 @@ return [
     'At least one site must be enabled for the product type.' => 'Pre typ produktu musí byť povolený aspoň jeden web.',
     'Auto-assign licenses on purchase' => 'Automaticky priraďovať licencie pri nákupe',
     'Auto-assign licenses on registration' => 'Automaticky priraďovať licencie pri registrácii',
-    'Automatic SKU Format' => 'Automatický SKU Formát',
+    'Automatic SKU Format' => 'Formát automatického SKU',
     'Choose which sites this product type should be available in, and configure the site-specific settings.' => 'Vyberte, na ktorých weboch by mal byť k dispozícii tento typ produktu, a nakonfigurujte nastavenia pre konkrétne weby.',
     'Couldn’t create license.' => 'Nepodarilo sa vytvoriť licenciu.',
     'Couldn’t delete product with existing licenses.' => 'Produkt s existujúcimi licenciami nie je možné odstrániť.',
