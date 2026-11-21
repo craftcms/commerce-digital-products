@@ -136,10 +136,10 @@ class Product extends Purchasable
     public static function statuses(): array
     {
         return [
-            self::STATUS_LIVE => t('Live', category: 'digital-products'),
-            self::STATUS_PENDING => t('Pending', category: 'digital-products'),
-            self::STATUS_EXPIRED => t('Expired', category: 'digital-products'),
-            self::STATUS_DISABLED => t('Disabled', category: 'digital-products'),
+            self::STATUS_LIVE => t('Live'),
+            self::STATUS_PENDING => t('Pending'),
+            self::STATUS_EXPIRED => t('Expired'),
+            self::STATUS_DISABLED => t('Disabled'),
         ];
     }
 
@@ -245,11 +245,11 @@ class Product extends Purchasable
     protected static function defineTableAttributes(): array
     {
         return array_merge(parent::defineTableAttributes(), [
-            'title' => ['label' => t('Title', category: 'digital-products')],
-            'type' => ['label' => t('Type', category: 'digital-products')],
-            'slug' => ['label' => t('Slug', category: 'digital-products')],
-            'postDate' => ['label' => t('Post Date', category: 'digital-products')],
-            'expiryDate' => ['label' => t('Expiry Date', category: 'digital-products')],
+            'title' => ['label' => t('Title')],
+            'type' => ['label' => t('Type')],
+            'slug' => ['label' => t('Slug')],
+            'postDate' => ['label' => t('Post Date')],
+            'expiryDate' => ['label' => t('Expiry Date')],
             'promotable' => ['label' => t('Promotable', category: 'digital-products')],
         ]);
     }
@@ -270,15 +270,15 @@ class Product extends Purchasable
     protected static function defineSortOptions(): array
     {
         return [
-            'title' => t('Title', category: 'digital-products'),
+            'title' => t('Title'),
             [
-                'label' => t('Post Date', category: 'digital-products'),
+                'label' => t('Post Date'),
                 'orderBy' => Table::PRODUCTS.'.postDate',
                 'attribute' => 'postDate',
                 'defaultDir' => 'desc',
             ],
             [
-                'label' => t('Expiry Date', category: 'digital-products'),
+                'label' => t('Expiry Date'),
                 'orderBy' => Table::PRODUCTS.'.expiryDate',
                 'attribute' => 'expiryDate',
                 'defaultDir' => 'desc',
@@ -602,13 +602,13 @@ class Product extends Purchasable
 
         return [
             Field::make(t('Slug'))->control($slug),
-            Field::make(t('Post Date', category: 'digital-products'))
+            Field::make(t('Post Date'))
                 ->control(DateTimeControl::make('postDate')
                     ->showTime()
                     ->minuteIncrement(1)
                     ->value(self::dateTimeControlValue($this->postDate))
                     ->mode($mode)),
-            Field::make(t('Expiry Date', category: 'digital-products'))
+            Field::make(t('Expiry Date'))
                 ->control(DateTimeControl::make('expiryDate')
                     ->showTime()
                     ->minuteIncrement(1)
@@ -625,7 +625,7 @@ class Product extends Purchasable
             $this->slugFieldHtml($static),
             FormFields::dateTimeFieldHtml([
                 'status' => $this->getAttributeStatus('postDate'),
-                'label' => t('Post Date', category: 'digital-products'),
+                'label' => t('Post Date'),
                 'id' => 'postDate',
                 'name' => 'postDate',
                 'value' => $this->postDate,
@@ -634,7 +634,7 @@ class Product extends Purchasable
             ]),
             FormFields::dateTimeFieldHtml([
                 'status' => $this->getAttributeStatus('expiryDate'),
-                'label' => t('Expiry Date', category: 'digital-products'),
+                'label' => t('Expiry Date'),
                 'id' => 'expiryDate',
                 'name' => 'expiryDate',
                 'value' => $this->expiryDate,
@@ -653,7 +653,7 @@ class Product extends Purchasable
             'promotable' => $this->promotable ? Html::tag('span', '', [
                 'class' => 'checkbox-icon',
                 'role' => 'img',
-                'title' => t('Yes', category: 'digital-products'),
+                'title' => t('Yes'),
             ]) : '',
             default => (string) parent::attributeHtml($attribute),
         };

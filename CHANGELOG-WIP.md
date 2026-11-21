@@ -15,6 +15,8 @@
 - Products and licenses now use Craft’s element indexes and element editor.
 - Product previews and sharing now use Craft’s element preview and sharing.
 - Products with licenses can no longer be deleted.
+- Digital Products is now translated into 33 languages.
+- Fixed control panel strings that used the wrong translation category.
 
 ### Console
 

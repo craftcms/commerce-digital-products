@@ -70,7 +70,7 @@ class License extends Element
     #[Override]
     public static function displayName(): string
     {
-        return t('License', category: 'digital-products');
+        return t('License');
     }
 
     #[Override]
@@ -148,7 +148,7 @@ class License extends Element
         return [
             'product' => ['label' => t('Licensed Product', category: 'digital-products')],
             'productType' => ['label' => t('Product Type', category: 'digital-products')],
-            'licenseKey' => ['label' => t('License Key', category: 'digital-products')],
+            'licenseKey' => ['label' => t('License Key')],
             'dateCreated' => ['label' => t('License Issue Date', category: 'digital-products')],
             'licensedTo' => ['label' => t('Licensed To', category: 'digital-products')],
             'orderLink' => ['label' => t('Associated Order', category: 'digital-products')],
@@ -257,7 +257,7 @@ class License extends Element
 
     public function getName(): string
     {
-        return t('License', category: 'digital-products');
+        return t('License');
     }
 
     #[Override]
@@ -367,7 +367,7 @@ class License extends Element
         }
 
         return [
-            t('License Key', category: 'digital-products') => Html::tag('code', Html::encode($this->licenseKey)),
+            t('License Key') => Html::tag('code', Html::encode($this->licenseKey)),
         ];
     }
 
@@ -390,7 +390,7 @@ class License extends Element
 
         // The key is editable until it's set; afterwards it's shown in the metadata
         if (! $this->hasLicenseKey()) {
-            $nodes[] = Field::make(t('License Key', category: 'digital-products'))
+            $nodes[] = Field::make(t('License Key'))
                 ->instructions(t('Leave blank to generate automatically.', category: 'digital-products'))
                 ->control(Text::make('licenseKey')->monospace()->value(null)->mode($mode));
         }
@@ -437,7 +437,7 @@ class License extends Element
 
         if (! $this->hasLicenseKey()) {
             $fields[] = FormFields::textFieldHtml([
-                'label' => t('License Key', category: 'digital-products'),
+                'label' => t('License Key'),
                 'instructions' => t('Leave blank to generate automatically.', category: 'digital-products'),
                 'id' => 'licenseKey',
                 'name' => 'licenseKey',
