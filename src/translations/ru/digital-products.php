@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'A deleted digital product' => 'Удалённый цифровой товар',
+    'A deleted digital product' => 'Удаленный цифровой товар',
     'A license must have either an email or an owner assigned to it.' => 'Лицензии должен быть назначен адрес эл. почты или владелец.',
     'Add a digital product' => 'Добавить цифровой товар',
     'All product types' => 'Все типы товаров',
@@ -74,7 +74,7 @@ return [
     'Product Type' => 'Тип товара',
     'Product Types' => 'Типы товаров',
     'Product created.' => 'Товар создан.',
-    'Product deleted.' => 'Товар удалён.',
+    'Product deleted.' => 'Товар удален.',
     'Product name' => 'Название товара',
     'Product order' => 'Заказ товара',
     'Product type URI Format' => 'Формат URI типа товара',
@@ -97,7 +97,7 @@ return [
     'The digital product that this license should be associated with' => 'Цифровой товар, с которым должна быть связана эта лицензия',
     'The download field must be an Assets field in the product type’s field layout.' => 'Поле для скачивания должно быть полем ресурсов в макете полей типа товара.',
     'The length of generated license keys. Must be between 0 and 256.' => 'Длина создаваемых лицензионных ключей. Должна быть от 0 до 256.',
-    'The license key is generated automatically' => 'Лицензионный ключ создаётся автоматически',
+    'The license key is generated automatically' => 'Лицензионный ключ создается автоматически',
     'View digital product type - {productType}' => 'Просмотр типа цифрового товара - {productType}',
     'View order' => 'Просмотреть заказ',
     'View order no. {number}' => 'Просмотреть заказ № {number}',
