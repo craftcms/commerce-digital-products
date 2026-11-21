@@ -1,0 +1,211 @@
+<?php
+
+use CraftCms\Cms\Database\Migration;
+use CraftCms\Cms\Database\Table as CraftTable;
+use CraftCms\Cms\Element\ElementCaches;
+use CraftCms\Cms\Support\Facades\Elements;
+use CraftCms\Cms\Support\Facades\Fields;
+use CraftCms\Cms\Support\Str;
+use CraftCms\Commerce\Database\Table;
+use CraftCms\Commerce\License\Elements\License;
+use CraftCms\Commerce\License\Licenses;
+use CraftCms\Commerce\Product\Elements\Product;
+use CraftCms\Commerce\Product\ProductType\ProductTypes;
+use CraftCms\Commerce\Product\Variant\Elements\Variant;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
+
+/**
+ * Moves digital products and licenses from the Digital Products plugin’s tables into Commerce.
+ *
+ * Written by `craft digital-products:migrate-to-commerce`, which also created the product types this needs in
+ * project config. Each digital product becomes the only variant of a new product, keeping its element ID, so
+ * line items, relations and licenses keep pointing at it. Licenses keep their IDs and keys. The plugin’s tables
+ * are emptied afterward, which turns on Commerce’s license features.
+ */
+return new class extends Migration
+{
+    public function up(): void
+    {
+        if (! Schema::hasTable('digitalproducts_products')) {
+            return;
+        }
+
+        DB::transaction(function () {
+            $this->moveProducts();
+            $this->moveLicenses();
+            $this->moveUserPermissions();
+
+            foreach (['digitalproducts_licenses', 'digitalproducts_products', 'digitalproducts_producttypes_sites', 'digitalproducts_producttypes'] as $table) {
+                DB::table($table)->delete();
+            }
+        });
+
+        Fields::invalidateCaches();
+        app(ElementCaches::class)->invalidateAll();
+        app(Licenses::class)->reset();
+    }
+
+    private function moveProducts(): void
+    {
+        $pluginProducts = DB::table('digitalproducts_products as p')
+            ->join('digitalproducts_producttypes as t', 't.id', '=', 'p.typeId')
+            ->select(['p.*', 't.uid as typeUid', 't.handle as typeHandle'])
+            ->orderBy('p.id')
+            ->get();
+
+        foreach ($pluginProducts as $pluginProduct) {
+            if (DB::table(Table::VARIANTS)->where('id', $pluginProduct->id)->exists()) {
+                continue;
+            }
+
+            $element = DB::table(CraftTable::ELEMENTS)->where('id', $pluginProduct->id)->first();
+
+            // Drafts and revisions of digital products have no variant equivalent
+            if (! $element || $element->canonicalId !== null || $element->draftId !== null || $element->revisionId !== null) {
+                continue;
+            }
+
+            $productType = app(ProductTypes::class)->getProductTypeByUid($pluginProduct->typeUid)
+                ?? throw new RuntimeException("The “{$pluginProduct->typeHandle}” product type doesn’t exist. Apply project config changes, then run this migration again.");
+
+            $sites = DB::table(CraftTable::ELEMENTS_SITES)->where('elementId', $pluginProduct->id)->get()->keyBy('siteId');
+            $primarySite = $sites->first(fn (object $site) => isset($productType->getSiteSettings()[$site->siteId])) ?? $sites->first();
+
+            $product = new Product;
+            $product->typeId = $productType->id;
+            $product->siteId = $primarySite->siteId;
+            $product->title = $primarySite->title;
+            $product->slug = $primarySite->slug;
+            $product->enabled = (bool) $element->enabled;
+            $product->postDate = $pluginProduct->postDate ? new DateTime($pluginProduct->postDate) : null;
+            $product->expiryDate = $pluginProduct->expiryDate ? new DateTime($pluginProduct->expiryDate) : null;
+            $product->dateCreated = new DateTime($pluginProduct->dateCreated);
+
+            // A product needs a variant to pass validation; its variant is attached below
+            if (! Elements::saveElement($product, runValidation: false)) {
+                throw new RuntimeException("Digital product {$pluginProduct->id} couldn’t be moved to a product.");
+            }
+
+            // Carry each site’s title, slug, URI and status over to the product. Variants don’t have URIs.
+            foreach ($sites as $siteId => $site) {
+                DB::table(CraftTable::ELEMENTS_SITES)
+                    ->where('elementId', $product->id)
+                    ->where('siteId', $siteId)
+                    ->update(['title' => $site->title, 'slug' => $site->slug, 'uri' => $site->uri, 'enabled' => $site->enabled]);
+            }
+
+            DB::table(CraftTable::ELEMENTS_SITES)->where('elementId', $pluginProduct->id)->update(['uri' => null]);
+            DB::table(CraftTable::ELEMENTS)->where('id', $pluginProduct->id)->update(['type' => Variant::class, 'enabled' => true]);
+
+            DB::table(Table::VARIANTS)->insert([
+                'id' => $pluginProduct->id,
+                'primaryOwnerId' => $product->id,
+                'isDefault' => true,
+                'issuesLicense' => true,
+                'dateCreated' => $pluginProduct->dateCreated,
+                'dateUpdated' => $pluginProduct->dateUpdated,
+                'uid' => $pluginProduct->uid,
+            ]);
+
+            DB::table(CraftTable::ELEMENTS_OWNERS)->insert([
+                'elementId' => $pluginProduct->id,
+                'ownerId' => $product->id,
+                'sortOrder' => 1,
+            ]);
+
+            // Digital products were never shipped or stocked
+            DB::table(Table::PURCHASABLES_STORES)->where('purchasableId', $pluginProduct->id)->update([
+                'promotable' => (bool) $pluginProduct->promotable,
+                'freeShipping' => true,
+                'inventoryTracked' => false,
+            ]);
+
+            if ($pluginProduct->taxCategoryId) {
+                DB::table(Table::PURCHASABLES)->where('id', $pluginProduct->id)->update(['taxCategoryId' => $pluginProduct->taxCategoryId]);
+            }
+
+            DB::table(Table::PRODUCTS)->where('id', $product->id)->update([
+                'defaultVariantId' => $pluginProduct->id,
+                'defaultSku' => DB::table(Table::PURCHASABLES)->where('id', $pluginProduct->id)->value('sku'),
+            ]);
+        }
+    }
+
+    private function moveLicenses(): void
+    {
+        DB::table('digitalproducts_licenses')->orderBy('id')->chunk(500, function ($pluginLicenses) {
+            $existingIds = DB::table(Table::LICENSES)->whereIn('id', $pluginLicenses->pluck('id'))->pluck('id')->all();
+            $variantIds = DB::table(Table::VARIANTS)->whereIn('id', $pluginLicenses->pluck('productId')->filter())->pluck('id')->all();
+
+            DB::table(Table::LICENSES)->insert($pluginLicenses
+                ->reject(fn (object $license) => in_array($license->id, $existingIds))
+                ->map(fn (object $license) => [
+                    'id' => $license->id,
+                    'variantId' => in_array($license->productId, $variantIds) ? $license->productId : null,
+                    'orderId' => $license->orderId,
+                    'licenseKey' => $license->licenseKey,
+                    'ownerName' => $license->ownerName,
+                    'ownerEmail' => $license->ownerEmail,
+                    'userId' => $license->userId,
+                    'dateCreated' => $license->dateCreated,
+                    'dateUpdated' => $license->dateUpdated,
+                    'uid' => $license->uid,
+                ])
+                ->values()
+                ->all());
+        });
+
+        $pluginLicenseTypes = ['CraftCms\\DigitalProducts\\Elements\\License', 'craft\\digitalproducts\\elements\\License'];
+        DB::table(CraftTable::ELEMENTS)->whereIn('type', $pluginLicenseTypes)->update(['type' => License::class]);
+    }
+
+    /**
+     * Grants the matching Commerce permissions to users who had a Digital Products permission. User groups got
+     * theirs from project config.
+     */
+    private function moveUserPermissions(): void
+    {
+        $permissions = DB::table(CraftTable::USERPERMISSIONS)
+            ->whereRaw('LOWER(name) LIKE ?', ['digitalproducts-%'])
+            ->get();
+
+        foreach ($permissions as $permission) {
+            $name = Str::lower($permission->name);
+            $newNames = match (true) {
+                $name === 'digitalproducts-managelicenses' => ['commerce-managelicenses'],
+                str_starts_with($name, 'digitalproducts-manageproducttype:') => array_map(
+                    fn (string $action) => "commerce-{$action}producttype:".Str::after($name, ':'),
+                    ['view', 'create', 'save', 'delete'],
+                ),
+                default => [],
+            };
+
+            $userIds = DB::table(CraftTable::USERPERMISSIONS_USERS)->where('permissionId', $permission->id)->pluck('userId');
+
+            foreach ($newNames as $newName) {
+                $newId = DB::table(CraftTable::USERPERMISSIONS)->whereRaw('LOWER(name) = ?', [$newName])->value('id')
+                    ?? DB::table(CraftTable::USERPERMISSIONS)->insertGetId([
+                        'name' => $newName,
+                        'dateCreated' => now(),
+                        'dateUpdated' => now(),
+                        'uid' => (string) Str::uuid(),
+                    ]);
+
+                $alreadyGranted = DB::table(CraftTable::USERPERMISSIONS_USERS)->where('permissionId', $newId)->pluck('userId');
+
+                foreach ($userIds->diff($alreadyGranted) as $userId) {
+                    DB::table(CraftTable::USERPERMISSIONS_USERS)->insert([
+                        'permissionId' => $newId,
+                        'userId' => $userId,
+                        'dateCreated' => now(),
+                        'dateUpdated' => now(),
+                        'uid' => (string) Str::uuid(),
+                    ]);
+                }
+            }
+
+            DB::table(CraftTable::USERPERMISSIONS_USERS)->where('permissionId', $permission->id)->delete();
+        }
+    }
+};

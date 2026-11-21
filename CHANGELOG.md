@@ -1,16 +1,55 @@
 # Release Notes for Digital Products
 
-## Unreleased
+## 5.1.0 - 2026-11-12
 
-- Fixed a bug where the `product()` method on `LicenseQuery` didn't accept arrays or `not` conditions. ([#104](https://github.com/craftcms/commerce-digital-products/issues/104))
-- Added a `digital-products/download/download` action that streams a licensed asset to the browser without exposing the underlying file URL. ([#67](https://github.com/craftcms/commerce-digital-products/issues/67), [#109](https://github.com/craftcms/commerce-digital-products/issues/109))
-- Fixed a PHP error that could occur when paying for a completed order that contains deleted digital products.
-- Fixed an SQL error that could occur when saving a new digital product. ([#110](https://github.com/craftcms/commerce-digital-products/issues/110))
+- Added a Download Field setting to digital product types, which limits the `digital-products/download/download` action to assets in that field. When no field is selected, licenses can still download any asset related to their product. ([#121](https://github.com/craftcms/commerce-digital-products/pull/121))
+- Added `craft\digitalproducts\models\ProductType::$downloadFieldUid`.
+- Added `craft\digitalproducts\models\ProductType::getDownloadField()`.
+- The `assetId` param for the `digital-products/download/download` action is now optional when the product type has a download field, and defaults to the field's first asset.
+- Fixed an error that occurred when viewing the Product Types settings pages when Dev Mode was enabled. ([#120](https://github.com/craftcms/commerce-digital-products/pull/120))
+- Fixed a bug where licenses without a product showed another product's name, including in the license editor and save notices. ([#120](https://github.com/craftcms/commerce-digital-products/pull/120))
+
+## 5.0.0 - 2026-11-12
+
+> [!WARNING]
+> Digital products' SKUs and prices are now stored in Commerce's `commerce_purchasables` and `commerce_purchasables_stores` tables. Code that reads the `sku` or `price` columns of the `digitalproducts_products` table directly must be updated.
+
+### Content Management
+
+- Digital products and licenses now use Craft's native element editor, with breadcrumb navigation, draft-based creation, and standard sidebar metadata.
+- Digital product edit pages now use Commerce's SKU and Price fields.
+- Licenses can now be created from the control panel via a "New license" button.
+- The Digital Products section of the control panel now opens the Products index instead of Licenses, when there are product types. ([#115](https://github.com/craftcms/commerce-digital-products/pull/115))
 - Fixed a bug where the Price field was not editable in the element index inline editor. ([#112](https://github.com/craftcms/commerce-digital-products/issues/112))
 - Fixed an error that occurred when viewing digital products in "Display as cards" view. ([#111](https://github.com/craftcms/commerce-digital-products/issues/111))
-- Digital products and Licenses now use Craft's native element editor, with breadcrumb navigation, draft-based creation, and standard sidebar metadata.
-- Licenses can now be created manually from the control panel via a "New license" button.
-- `productId` and `ownerEmail` columns are now nullable, allowing licenses to be created without an initial product or owner email.
+
+### Administration
+
+- Licenses now support custom fields, managed from Digital Products → Settings → License Fields. ([#30](https://github.com/craftcms/commerce-digital-products/issues/30))
+- Product types are now managed from Digital Products → Settings → Product Types.
+
+### Development
+
+- Added the `digital-products/download/download` action, which streams a licensed asset to the browser without exposing the underlying file URL. ([#67](https://github.com/craftcms/commerce-digital-products/issues/67), [#109](https://github.com/craftcms/commerce-digital-products/issues/109))
+- Fixed a bug where the `product()` method on `craft\digitalproducts\elements\db\LicenseQuery` didn't accept arrays or `not` conditions. ([#104](https://github.com/craftcms/commerce-digital-products/issues/104))
+- Fixed a bug where the `product()` method on `craft\digitalproducts\elements\db\LicenseQuery` returned all licenses when no products matched the given SKUs. ([#119](https://github.com/craftcms/commerce-digital-products/pull/119))
+
+### Extensibility
+
+- `craft\digitalproducts\elements\db\ProductQuery` now extends `craft\commerce\elements\db\PurchasableQuery`.
+- Removed `craft\digitalproducts\controllers\ProductsController::actionEdit()` and `actionSave()`. Products are now edited and saved via Craft's `elements/edit` and `elements/save` actions.
+- Removed `craft\digitalproducts\elements\Product::getEditorHtml()`.
+
+### System
+
+- Removed the `sku` and `price` columns from the `digitalproducts_products` table.
+- The `productId` and `ownerEmail` columns on the `digitalproducts_licenses` table are now nullable.
+
+## 4.1.0 - 2026-07-08
+
+- Fixed a [high-severity](https://github.com/craftcms/cms/security/policy#severity--remediation) RCE vulnerability. ([GHSA-46mx-jh57-9v4h](https://github.com/craftcms/commerce-digital-products/security/advisories/GHSA-46mx-jh57-9v4h))
+- Fixed a PHP error that could occur when paying for a completed order that contains deleted digital products.
+- Fixed an SQL error that could occur when saving a new digital product. ([#110](https://github.com/craftcms/commerce-digital-products/issues/110))
 
 ## 4.0.3 - 2025-02-03
 

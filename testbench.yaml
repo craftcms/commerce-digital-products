@@ -1,0 +1,29 @@
+laravel: '@testbench'
+
+providers:
+  - Workbench\App\Providers\WorkbenchServiceProvider
+  - Inertia\ServiceProvider
+
+env:
+  - APP_NAME="Digital Products Workbench"
+  - APP_URL=http://127.0.0.1:8000
+  - AUTH_MODEL=CraftCms\Cms\User\Models\User
+  - CRAFT_EDITION=pro
+  - DB_CONNECTION=sqlite
+  - CACHE_STORE=file
+  - SESSION_DRIVER=file
+  - QUEUE_CONNECTION=sync
+
+seeders:
+  - Workbench\Database\Seeders\DatabaseSeeder
+
+workbench:
+  start: /admin
+  user: 1
+  install: false
+  discovers:
+    web: true
+  sync:
+    - from: storage
+      to: workbench/storage
+      reverse: true
