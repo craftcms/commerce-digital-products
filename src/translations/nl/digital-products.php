@@ -101,7 +101,7 @@ return [
     'View digital product type - {productType}' => 'Digitaal producttype bekijken - {productType}',
     'View order' => 'Bestelling bekijken',
     'View order no. {number}' => 'Bestelling nr. {number} bekijken',
-    'What product type URIs should look like for the site.' => 'De notatie van producttype-URI’s voor de website.',
+    'What product type URIs should look like for the site.' => 'De notatie van producttype-URI\'s voor de website.',
     'What the unique auto-generated SKUs should look like, when a SKU field is submitted without a value. You can include tags that output properties, such as {ex1} or {ex2}' => 'Hoe de unieke, automatisch gegenereerde artikelnummers eruit moeten zien wanneer een artikelnummerveld zonder waarde wordt verzonden. U kunt tags opnemen die eigenschappen weergeven, zoals {ex1} of {ex2}',
     'What this product type will be called in the CP.' => 'Naam van dit producttype in het configuratiescherm.',
     'Whether a user must be logged in when completing an order with at least one digital product in the cart.' => 'Of een gebruiker ingelogd moet zijn bij het voltooien van een bestelling met ten minste één digitaal product in de winkelwagen.',
