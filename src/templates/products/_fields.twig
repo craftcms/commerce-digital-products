@@ -2,7 +2,7 @@
   {%- import "_includes/forms" as forms -%}
 
   {{ forms.textField({
-    label: "Title"|t('digital-products'),
+    label: "Title"|t('app'),
     site: product.site,
     id: 'title',
     name: 'title',
@@ -21,7 +21,7 @@
   {%- import "_includes/forms" as forms -%}
 
   {{ forms.textField({
-    label: "Slug"|t('digital-products'),
+    label: "Slug"|t('app'),
     id: 'slug',
     name: 'slug',
     value: product.slug,
@@ -30,7 +30,7 @@
   }) }}
 
   {{ forms.dateTimeField({
-    label: 'Post Date'|t('digital-products'),
+    label: 'Post Date'|t('app'),
     id: 'postDate',
     name: 'postDate',
     value: product.postDate,
@@ -38,7 +38,7 @@
   }) }}
 
   {{ forms.dateTimeField({
-    label: 'Expiry Date'|t('digital-products'),
+    label: 'Expiry Date'|t('app'),
     id: 'expiryDate',
     name: 'expiryDate',
     value: product.expiryDate,

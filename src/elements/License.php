@@ -108,7 +108,7 @@ class License extends Element
      */
     public static function displayName(): string
     {
-        return Craft::t('digital-products', 'License');
+        return Craft::t('app', 'License');
     }
 
     /**
@@ -371,7 +371,7 @@ class License extends Element
      */
     public function getName(): ?string
     {
-        return Craft::t('digital-products', 'License');
+        return Craft::t('app', 'License');
     }
 
     /**

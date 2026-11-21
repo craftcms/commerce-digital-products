@@ -433,7 +433,7 @@ class ProductTypes extends Component
                 $sitesService = Craft::$app->getSites();
                 foreach ($siteSettingData as $siteUid => $siteSettings) {
                     Craft::$app->getQueue()->push(new ResaveElements([
-                        'description' => Craft::t('app', 'Resaving {type} products ({site})', [
+                        'description' => Craft::t('digital-products', 'Resaving {type} products ({site})', [
                             'type' => $productTypeRecord->name,
                             'site' => $sitesService->getSiteByUid($siteUid)->name,
                         ]),

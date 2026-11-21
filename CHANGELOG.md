@@ -1,5 +1,10 @@
 # Release Notes for Digital Products
 
+## Unreleased
+
+- Digital Products is now translated into 33 languages.
+- Fixed control panel strings that weren’t translatable or used the wrong translation category.
+
 ## 5.1.0 - 2026-11-12
 
 - Added a Download Field setting to digital product types, which limits the `digital-products/download/download` action to assets in that field. When no field is selected, licenses can still download any asset related to their product. ([#121](https://github.com/craftcms/commerce-digital-products/pull/121))

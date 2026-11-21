@@ -222,10 +222,10 @@ class Product extends Purchasable
     public function getStatuses(): array
     {
         return [
-            self::STATUS_LIVE => Craft::t('digital-products', 'Live'),
-            self::STATUS_PENDING => Craft::t('digital-products', 'Pending'),
-            self::STATUS_EXPIRED => Craft::t('digital-products', 'Expired'),
-            self::STATUS_DISABLED => Craft::t('digital-products', 'Disabled'),
+            self::STATUS_LIVE => Craft::t('app', 'Live'),
+            self::STATUS_PENDING => Craft::t('app', 'Pending'),
+            self::STATUS_EXPIRED => Craft::t('app', 'Expired'),
+            self::STATUS_DISABLED => Craft::t('app', 'Disabled'),
         ];
     }
 
@@ -439,7 +439,7 @@ class Product extends Purchasable
 
         $fields[] = Cp::dateTimeFieldHtml([
             'status' => $this->getAttributeStatus('postDate'),
-            'label' => Craft::t('digital-products', 'Post Date'),
+            'label' => Craft::t('app', 'Post Date'),
             'id' => 'postDate',
             'name' => 'postDate',
             'value' => $this->postDate,
@@ -449,7 +449,7 @@ class Product extends Purchasable
 
         $fields[] = Cp::dateTimeFieldHtml([
             'status' => $this->getAttributeStatus('expiryDate'),
-            'label' => Craft::t('digital-products', 'Expiry Date'),
+            'label' => Craft::t('app', 'Expiry Date'),
             'id' => 'expiryDate',
             'name' => 'expiryDate',
             'value' => $this->expiryDate,
@@ -767,13 +767,13 @@ class Product extends Purchasable
     protected static function defineTableAttributes(): array
     {
         return [
-            'title' => ['label' => Craft::t('digital-products', 'Title')],
-            'type' => ['label' => Craft::t('digital-products', 'Type')],
-            'slug' => ['label' => Craft::t('digital-products', 'Slug')],
+            'title' => ['label' => Craft::t('app', 'Title')],
+            'type' => ['label' => Craft::t('app', 'Type')],
+            'slug' => ['label' => Craft::t('app', 'Slug')],
             'sku' => ['label' => Craft::t('digital-products', 'SKU')],
             'price' => ['label' => Craft::t('digital-products', 'Price')],
-            'postDate' => ['label' => Craft::t('digital-products', 'Post Date')],
-            'expiryDate' => ['label' => Craft::t('digital-products', 'Expiry Date')],
+            'postDate' => ['label' => Craft::t('app', 'Post Date')],
+            'expiryDate' => ['label' => Craft::t('app', 'Expiry Date')],
         ];
     }
 
@@ -825,7 +825,7 @@ class Product extends Purchasable
                 return Craft::$app->getLocale()->getFormatter()->asCurrency($this->basePrice, strtoupper($code));
 
             case 'promotable':
-                return ($this->$attribute ? '<span data-icon="check" title="' . Craft::t('digital-products', 'Yes') . '"></span>' : '');
+                return ($this->$attribute ? '<span data-icon="check" title="' . Craft::t('app', 'Yes') . '"></span>' : '');
 
             default:
                 return parent::attributeHtml($attribute);
@@ -838,14 +838,14 @@ class Product extends Purchasable
     protected static function defineSortOptions(): array
     {
         return [
-            'title' => Craft::t('digital-products', 'Title'),
+            'title' => Craft::t('app', 'Title'),
             [
-                'label' => Craft::t('digital-products', 'Post Date'),
+                'label' => Craft::t('app', 'Post Date'),
                 'orderBy' => 'postDate',
                 'defaultDir' => 'desc',
             ],
             [
-                'label' => Craft::t('digital-products', 'Expiry Date'),
+                'label' => Craft::t('app', 'Expiry Date'),
                 'orderBy' => 'expiryDate',
                 'defaultDir' => 'desc',
             ],

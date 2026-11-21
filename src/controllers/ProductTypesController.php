@@ -119,7 +119,7 @@ class ProductTypesController extends BaseController
             return $this->redirectToPostedUrl($productType);
         }
 
-        Craft::$app->getSession()->setError(Craft::t('commerce', 'Couldn’t save product type.'));
+        Craft::$app->getSession()->setError(Craft::t('digital-products', 'Couldn’t save product type.'));
 
         // Send the productType back to the template
         /** @var UrlManager $urlManager */

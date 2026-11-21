@@ -82,7 +82,7 @@ Craft.DigitalProducts.ProductIndex = Craft.BaseElementIndex.extend({
       // Otherwise only show a menu button
       if (selectedProductType) {
         href = this._getProductTypeTriggerHref(selectedProductType);
-        label = (this.settings.context === 'index' ? Craft.t('commerce', 'New product') : Craft.t('commerce', 'New {productType} product', {productType: selectedProductType.name}));
+        label = (this.settings.context === 'index' ? Craft.t('digital-products', 'New product') : Craft.t('digital-products', 'New {productType} product', {productType: selectedProductType.name}));
         this.$newProductBtn = $('<a class="btn submit add icon" ' + href + '>' + Craft.escapeHtml(label) + '</a>').appendTo(this.$newProductBtnProductType);
 
         if (this.settings.context !== 'index') {
@@ -95,7 +95,7 @@ Craft.DigitalProducts.ProductIndex = Craft.BaseElementIndex.extend({
           $menuBtn = $('<div class="btn submit menubtn"></div>').appendTo(this.$newProductBtnProductType);
         }
       } else {
-        this.$newProductBtn = $menuBtn = $('<div class="btn submit add icon menubtn">' + Craft.t('commerce', 'New product') + '</div>').appendTo(this.$newProductBtnProductType);
+        this.$newProductBtn = $menuBtn = $('<div class="btn submit add icon menubtn">' + Craft.t('digital-products', 'New product') + '</div>').appendTo(this.$newProductBtnProductType);
       }
 
       if ($menuBtn) {
@@ -106,7 +106,7 @@ Craft.DigitalProducts.ProductIndex = Craft.BaseElementIndex.extend({
 
           if (this.settings.context === 'index' || productType !== selectedProductType) {
             href = this._getProductTypeTriggerHref(productType);
-            label = (this.settings.context === 'index' ? productType.name : Craft.t('commerce', 'New {productType} product', {productType: productType.name}));
+            label = (this.settings.context === 'index' ? productType.name : Craft.t('digital-products', 'New {productType} product', {productType: productType.name}));
             menuHtml += '<li><a ' + href + '">' + Craft.escapeHtml(label) + '</a></li>';
           }
         }
@@ -177,7 +177,7 @@ Craft.DigitalProducts.ProductIndex = Craft.BaseElementIndex.extend({
 
     this.$newProductBtn.addClass('inactive');
     var newProductBtnText = this.$newProductBtn.text();
-    this.$newProductBtn.text(Craft.t('commerce', 'New {productType} product', {productType: productType.name}));
+    this.$newProductBtn.text(Craft.t('digital-products', 'New {productType} product', {productType: productType.name}));
 
     Craft.createElementEditor(this.elementType, {
       hudTrigger: this.$newProductBtnProductType,

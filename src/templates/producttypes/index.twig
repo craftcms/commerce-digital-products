@@ -11,16 +11,16 @@
   {% if productTypes|length %}
     <table id="productTypes" class="data fullwidth collapsible">
         <thead>
-          <th scope="col">{{ "Name"|t('digital-products') }}</th>
-          <th scope="col">{{ "Handle"|t('digital-products') }}</th>
+          <th scope="col">{{ "Name"|t('app') }}</th>
+          <th scope="col">{{ "Handle"|t('app') }}</th>
           <td class="thin"></td>
         </thead>
         <tbody>
         {% for productType in productTypes %}
-          <tr data-id="{{ productType.id }}" data-name="{{ productType.name|t('digital-products') }}">
-            <th scope="row" data-title="{{ 'Name'|t('digital-products') }}"><a href="{{ url('digital-products/producttypes/' ~ productType.id) }}">{{ productType.name|t('digital-products') }}</a></th>
-            <td data-title="{{ 'Handle'|t('digital-products') }}"><code>{{ productType.handle }}</code></td>
-            <td class="thin"><a class="delete icon" title="{{ 'Delete'|t('digital-products') }}" role="button"></a></td>
+          <tr data-id="{{ productType.id }}" data-name="{{ productType.name|t('site') }}">
+            <th scope="row" data-title="{{ 'Name'|t('app') }}"><a href="{{ url('digital-products/producttypes/' ~ productType.id) }}">{{ productType.name|t('site') }}</a></th>
+            <td data-title="{{ 'Handle'|t('app') }}"><code>{{ productType.handle }}</code></td>
+            <td class="thin"><a class="delete icon" title="{{ 'Delete'|t('app') }}" role="button"></a></td>
           </tr>
         {% endfor %}
         </tbody>
