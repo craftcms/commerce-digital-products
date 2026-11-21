@@ -12,7 +12,7 @@ return [
     'Are you sure you want to delete this product?' => 'Jeste li sigurni da želite izbrisati ovaj proizvod?',
     'Are you sure you want to delete “{name}” and all its products?' => 'Jeste li sigurni da želite izbrisati „{name}“ i sve njegove proizvode?',
     'Associated Order' => 'Povezana narudžba',
-    'Associated Sales' => 'Povezana sniženja',
+    'Associated Sales' => 'Povezane akcije',
     'Auto-assign licenses on purchase' => 'Automatski dodijeli licence pri kupnji',
     'Auto-assign licenses on registration' => 'Automatski dodijeli licence pri registraciji',
     'Automatic SKU Format' => 'Format automatskog SKU-a',

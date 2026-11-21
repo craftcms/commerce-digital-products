@@ -81,7 +81,7 @@ return [
     'Product type saved.' => 'บันทึกประเภทสินค้าแล้ว',
     'Products' => 'สินค้า',
     'Products deleted.' => 'ลบสินค้าแล้ว',
-    'Promotable' => 'ส่งเสริมการขายได้',
+    'Promotable' => 'ใช้โปรโมชันได้',
     'Require a logged in user' => 'ต้องให้ผู้ใช้เข้าสู่ระบบ',
     'Required if Owner Email is blank.' => 'จำเป็นหากอีเมลของเจ้าของว่างอยู่',
     'Required if Owner is blank.' => 'จำเป็นหากเจ้าของว่างอยู่',

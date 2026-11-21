@@ -81,7 +81,7 @@ return [
     'Product type saved.' => 'تم حفظ نوع المنتج.',
     'Products' => 'المنتجات',
     'Products deleted.' => 'تم حذف المنتجات.',
-    'Promotable' => 'قابل للعروض الترويجية',
+    'Promotable' => 'قابل للترويج',
     'Require a logged in user' => 'اشتراط تسجيل دخول المستخدم',
     'Required if Owner Email is blank.' => 'مطلوب إذا كان البريد الإلكتروني للمالك فارغًا.',
     'Required if Owner is blank.' => 'مطلوب إذا كان المالك فارغًا.',

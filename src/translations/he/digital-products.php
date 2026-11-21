@@ -81,7 +81,7 @@ return [
     'Product type saved.' => 'סוג המוצר נשמר.',
     'Products' => 'מוצרים',
     'Products deleted.' => 'המוצרים נמחקו.',
-    'Promotable' => 'ניתן לקידום מכירות',
+    'Promotable' => 'זכאי למבצעים',
     'Require a logged in user' => 'דרוש משתמש מחובר',
     'Required if Owner Email is blank.' => 'נדרש אם אימייל הבעלים ריק.',
     'Required if Owner is blank.' => 'נדרש אם הבעלים ריק.',
