@@ -55,7 +55,7 @@ return [
     'Product type saved.' => 'Vörutegund vistuð.',
     'Products' => 'Vörur',
     'Products deleted.' => 'Vörum eytt.',
-    'Promotable' => 'Má nota í tilboðum',
+    'Promotable' => 'Má fara á tilboð',
     'Require a logged in user' => 'Krefjast innskráðs notanda',
     'Required if Owner Email is blank.' => 'Áskilið ef Netfang eiganda er autt.',
     'Required if Owner is blank.' => 'Áskilið ef Eigandi er autt.',

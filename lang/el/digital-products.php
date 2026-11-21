@@ -55,7 +55,7 @@ return [
     'Product type saved.' => 'Ο τύπος προϊόντος αποθηκεύτηκε.',
     'Products' => 'Προϊόντα',
     'Products deleted.' => 'Τα προϊόντα διαγράφηκαν.',
-    'Promotable' => 'Επιδέχεται προσφορές',
+    'Promotable' => 'Επιδέχεται προώθηση',
     'Require a logged in user' => 'Απαίτηση συνδεδεμένου χρήστη',
     'Required if Owner Email is blank.' => 'Υποχρεωτικό αν το πεδίο «Email ιδιοκτήτη» είναι κενό.',
     'Required if Owner is blank.' => 'Υποχρεωτικό αν το πεδίο «Ιδιοκτήτης» είναι κενό.',

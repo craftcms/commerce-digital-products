@@ -55,7 +55,7 @@ return [
     'Product type saved.' => 'Produkttyp gespeichert.',
     'Products' => 'Produkte',
     'Products deleted.' => 'Produkte gelöscht.',
-    'Promotable' => 'Aktionsfähig',
+    'Promotable' => 'Für Werbeaktionen geeignet',
     'Require a logged in user' => 'Angemeldeten Benutzer voraussetzen',
     'Required if Owner Email is blank.' => 'Erforderlich, wenn „E-Mail des Besitzers“ leer ist.',
     'Required if Owner is blank.' => 'Erforderlich, wenn „Besitzer“ leer ist.',

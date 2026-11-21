@@ -55,7 +55,7 @@ return [
     'Product type saved.' => 'Produkttypen er lagra.',
     'Products' => 'Produkt',
     'Products deleted.' => 'Produkta er sletta.',
-    'Promotable' => 'Promoterbar',
+    'Promotable' => 'Kan inngå i kampanjar',
     'Require a logged in user' => 'Krev ein innlogga brukar',
     'Required if Owner Email is blank.' => 'Påkravd dersom E-posten til eigaren er tom.',
     'Required if Owner is blank.' => 'Påkravd dersom Eigar er tom.',

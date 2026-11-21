@@ -55,7 +55,7 @@ return [
     'Product type saved.' => 'نوع محصول ذخیره گردید.',
     'Products' => 'محصولات',
     'Products deleted.' => 'محصولات حذف گردیدند.',
-    'Promotable' => 'مشمول تخفیف',
+    'Promotable' => 'مشمول پیشنهادهای ویژه',
     'Require a logged in user' => 'الزام ورود کاربر',
     'Required if Owner Email is blank.' => 'در صورت خالی بودن پست الکترونیکی مالک، اجباری است.',
     'Required if Owner is blank.' => 'در صورت خالی بودن مالک، اجباری است.',
